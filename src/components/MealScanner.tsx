@@ -1,16 +1,14 @@
 import { useState, useEffect } from "react";
+import { API_BASE } from "../lib/api";
 import {
   Scan,
   Clock,
   CheckCircle,
   XCircle,
-  AlertTriangle,
   User,
   Building,
-  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
-import { API_BASE } from "../lib/api";
 
 interface MealScannerProps {
   mealType: "breakfast-dinner" | "lunch";
@@ -23,41 +21,30 @@ interface ScanRecord {
   time: string;
   status: "success" | "error";
   message: string;
+  photoUrl?: string;
+}
+
+interface StudentData {
+  studentId: string;
+  firstName: string;
+  lastName: string;
+  buildingNumber: string;
+  photoUrl?: string;
+}
+
+interface ScanResult {
+  success: boolean;
+  message: string;
+  student?: StudentData;
 }
 
 export default function MealScanner({ mealType }: MealScannerProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [barcodeInput, setBarcodeInput] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [modalData, setModalData] = useState<any>(null);
-  const [scanHistory, setScanHistory] = useState<ScanRecord[]>([
-    {
-      id: 1,
-      studentId: "STU001234",
-      studentName: "Ahmed Hassan",
-      time: "18:45",
-      status: "success",
-      message: "تم مسح الوجبة بنجاح",
-    },
-    {
-      id: 2,
-      studentId: "STU001235",
-      studentName: "Sarah Mohamed",
-      time: "18:42",
-      status: "success",
-      message: "Meal scanned successfully",
-    },
-    {
-      id: 3,
-      studentId: "STU001236",
-      studentName: "Omar Ali",
-      time: "18:38",
-      status: "error",
-      message: "تم تناوله بالفعل اليوم",
-    },
-  ]);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [scanHistory, setScanHistory] = useState<ScanRecord[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
 
-  // Update clock every second
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -66,11 +53,10 @@ export default function MealScanner({ mealType }: MealScannerProps) {
   }, []);
 
   const getMealInfo = () => {
+    const hour = currentTime.getHours();
+
     if (mealType === "breakfast-dinner") {
-      const hour = currentTime.getHours();
-      if (hour >= 7 && hour < 10) {
-        return { name: "إفطار", time: "7:00 AM - 10:00 AM", active: true };
-      } else if (hour >= 18 && hour < 21) {
+      if (hour >= 0 && hour < 2) {
         return { name: "عشاء", time: "6:00 PM - 9:00 PM", active: true };
       }
       return {
@@ -79,154 +65,83 @@ export default function MealScanner({ mealType }: MealScannerProps) {
         active: false,
       };
     } else {
-      const hour = currentTime.getHours();
-      if (hour >= 13 && hour < 21) {
+      if (hour >= 13 && hour < 24) {
         return { name: "غداء", time: "1:00 PM - 9:00 PM", active: true };
       }
       return { name: "غداء", time: "خارج ساعات الوجبات", active: false };
     }
   };
 
-  const mockStudentData: any = {
-    STU001234: {
-      name: "Ahmed Hassan",
-      building: "Building A",
-      room: "A-205",
-      faculty: "Engineering",
-      status: "success",
-      message: "تم مسح الوجبة بنجاح",
-    },
-    STU001235: {
-      name: "Sarah Mohamed",
-      building: "Building C",
-      room: "C-104",
-      faculty: "Medicine",
-      status: "success",
-      message: "تم مسح الوجبة بنجاح",
-    },
-    STU001236: {
-      name: "Omar Ali",
-      building: "Building B",
-      room: "B-301",
-      faculty: "Business",
-      status: "error",
-      message: "تم تناوله بالفعل اليوم",
-    },
-    STU001237: {
-      name: "Fatima Khalil",
-      building: "Building D",
-      room: "D-210",
-      faculty: "Engineering",
-      status: "error",
-      message: "الطالب في إجازة",
-    },
-    STU001238: {
-      name: "Youssef Ibrahim",
-      building: "Building E",
-      room: "E-102",
-      faculty: "Arts",
-      status: "error",
-      message: "المبنى خاطئ",
-    },
+  const getFullPhotoUrl = (relativePath?: string) => {
+    if (!relativePath) return undefined;
+    return `${API_BASE}${relativePath}`;
   };
 
-  const handleScan = async (studentId: string) => {
-    // Try calling backend scan endpoint first
+  const handleScan = async (nationalId: string) => {
+    if (!nationalId.trim()) return;
+
+    setIsScanning(true);
+
     try {
-      const token = localStorage.getItem("authToken");
+      const token =
+        localStorage.getItem("authToken") || localStorage.getItem("token");
+      const mealTypeId = mealType === "breakfast-dinner" ? 1 : 2;
+
       const res = await fetch(`${API_BASE}/api/Meals/scan`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ studentId, mealType: mealType }),
+        body: JSON.stringify({
+          nationalId: nationalId.trim(),
+          mealTypeId: mealTypeId,
+        }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        // Expecting { status, message, name, building, room, faculty }
-        const status = data?.status || (data?.ok ? "success" : "error");
-        const message =
-          data?.message ||
-          (status === "success" ? "تم مسح الوجبة بنجاح" : "خطأ في المسح");
+      const data: ScanResult = await res.json();
 
-        const modal = {
-          status: status === "success" ? "success" : "error",
-          message,
-          name: data?.name,
-          studentId,
-          building: data?.building,
-          room: data?.room,
-          faculty: data?.faculty,
-        };
-        setModalData(modal);
-        setShowModal(true);
+      if (data.student && data.student.photoUrl) {
+        data.student.photoUrl = getFullPhotoUrl(data.student.photoUrl);
+      }
 
+      setScanResult(data);
+
+      if (data.student) {
         const newRecord: ScanRecord = {
           id: Date.now(),
-          studentId,
-          studentName: data?.name || studentId,
-          time: currentTime.toLocaleTimeString("en-US", {
+          studentId: data.student.studentId,
+          studentName: `${data.student.firstName} ${data.student.lastName}`,
+          time: currentTime.toLocaleTimeString("ar-EG", {
             hour: "2-digit",
             minute: "2-digit",
           }),
-          status: status === "success" ? "success" : "error",
-          message,
+          status: data.success ? "success" : "error",
+          message: data.message,
+          photoUrl: data.student.photoUrl,
         };
         setScanHistory([newRecord, ...scanHistory.slice(0, 9)]);
-
-        if (status === "success") toast.success(message);
-        else toast.error(message);
-        return;
       }
-    } catch (err: any) {
-      // fall back to mock behavior below
-    }
 
-    // Fallback: local mock
-    const student = mockStudentData[studentId];
-
-    if (!student) {
-      setModalData({
-        status: "error",
-        message: "لم يتم العثور على الطالب",
-        studentId: studentId,
+      if (data.success) {
+        toast.success(data.message || "تم مسح الوجبة بنجاح");
+      } else {
+        toast.error(data.message || "حدث خطأ أثناء المسح");
+      }
+    } catch (err) {
+      const errorMessage = "حدث خطأ في الاتصال بالنظام";
+      setScanResult({
+        success: false,
+        message: errorMessage,
       });
-      setShowModal(true);
-      toast.error("لم يتم العثور على الطالب");
-      return;
-    }
-
-    setModalData({
-      ...student,
-      studentId: studentId,
-    });
-    setShowModal(true);
-
-    // Add to history
-    const newRecord: ScanRecord = {
-      id: Date.now(),
-      studentId: studentId,
-      studentName: student.name,
-      time: currentTime.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      status: student.status,
-      message: student.message,
-    };
-    setScanHistory([newRecord, ...scanHistory.slice(0, 9)]);
-
-    if (student.status === "success") {
-      toast.success("تم مسح الوجبة بنجاح!");
-    } else {
-      toast.error(student.message);
+      toast.error(errorMessage);
+    } finally {
+      setIsScanning(false);
     }
   };
 
-  const handleBarcodeSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleBarcodeSubmit = (e: React.FormEvent | any) => {
+    e?.preventDefault?.();
     if (barcodeInput.trim()) {
       handleScan(barcodeInput.trim());
       setBarcodeInput("");
@@ -235,8 +150,18 @@ export default function MealScanner({ mealType }: MealScannerProps) {
 
   const mealInfo = getMealInfo();
 
+  // Page-level background classes based on scan result:
+  // default: white, success: green, error: red
+  const pageBgClass = scanResult
+    ? scanResult.success
+      ? "bg-green-100"
+      : "bg-red-100"
+    : "bg-white";
+
   return (
-    <div className="space-y-6">
+    <div
+      className={`space-y-6 min-h-screen transition-colors duration-300 ${pageBgClass}`}
+    >
       {/* Header with Clock */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow-lg p-8 text-white">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
@@ -264,7 +189,7 @@ export default function MealScanner({ mealType }: MealScannerProps) {
               })}
             </p>
             <p className="text-blue-100 text-sm mt-1">
-              {currentTime.toLocaleDateString("en-US", {
+              {currentTime.toLocaleDateString("ar-EG", {
                 weekday: "long",
                 year: "numeric",
                 month: "long",
@@ -275,180 +200,232 @@ export default function MealScanner({ mealType }: MealScannerProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Scanner Interface */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow-lg p-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-0 lg:px-2">
+        {/* Center - Student Info with Large Photo */}
+        <div className="lg:col-span-2 order-1 lg:order-2 space-y-6">
+          {scanResult && scanResult.student ? (
+            <div className="bg-white rounded-lg shadow-lg p-8">
+              <div className="flex flex-col lg:flex-row gap-8 items-center">
+                {/* Large Photo Section */}
+                <div className="flex-shrink-0 flex justify-center">
+                  {scanResult.student.photoUrl ? (
+                    <img
+                      src={scanResult.student.photoUrl}
+                      alt={`${scanResult.student.firstName} ${scanResult.student.lastName}`}
+                      // width left same as w-64 (256px) and reduce height by 3px (253px).
+                      className="w-64 rounded-2xl object-cover border-4 border-gray-200 shadow-lg relative"
+                      style={{ height: "253px", left: "-2px" }}
+                    />
+                  ) : (
+                    <div
+                      className="w-64 rounded-2xl flex items-center justify-center border-4 border-gray-200 shadow-lg relative bg-gray-200"
+                      style={{ height: "253px", left: "-2px" }}
+                    >
+                      <User className="w-32 h-32 text-gray-400" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Student Info Section */}
+                <div className="flex-1 flex flex-col justify-center space-y-6 w-full">
+                  {/* Status Message */}
+                  <div
+                    className={`p-4 rounded-lg ${
+                      scanResult.success
+                        ? "bg-green-50 border-2 border-green-200"
+                        : "bg-red-50 border-2 border-red-200"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {scanResult.success ? (
+                          <CheckCircle className="w-6 h-6 text-green-600" />
+                        ) : (
+                          <XCircle className="w-6 h-6 text-red-600" />
+                        )}
+                        <h3
+                          className={`text-lg font-bold ${
+                            scanResult.success
+                              ? "text-green-700"
+                              : "text-red-700"
+                          }`}
+                        >
+                          {scanResult.message}
+                        </h3>
+                      </div>
+                      <span className="text-gray-500 text-sm">
+                        {currentTime.toLocaleTimeString("ar-EG", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Student Name */}
+                  <div>
+                    <h4 className="text-3xl font-bold text-gray-900">
+                      {scanResult.student.firstName}{" "}
+                      {scanResult.student.lastName}
+                    </h4>
+                    <p className="text-xl text-gray-600 mt-2">
+                      {scanResult.student.studentId}
+                    </p>
+                  </div>
+
+                  {/* Building Info */}
+                  <div className="bg-gray-50 p-5 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Building className="w-6 h-6 text-gray-600" />
+                      <div>
+                        <p className="text-sm text-gray-600 font-medium">
+                          المبنى
+                        </p>
+                        <p className="text-xl text-gray-900 font-bold">
+                          {scanResult.student.buildingNumber}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Final Status */}
+                  <div
+                    className={`p-4 rounded-lg text-center ${
+                      scanResult.success
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    <p className="font-bold text-lg">
+                      {scanResult.success
+                        ? "✓ تم تسجيل الوجبة بنجاح"
+                        : "✗ لم يتم تسجيل الوجبة"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Scan History */}
+          <div className="bg-white rounded-lg shadow-lg">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-gray-900">السجلات الأخيرة</h2>
+            </div>
+            <div className="p-4 max-h-[400px] overflow-y-auto">
+              {scanHistory.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  لا توجد عمليات مسح حتى الآن
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {scanHistory.map((record) => (
+                    <div
+                      key={record.id}
+                      className={`p-4 rounded-lg border-2 ${
+                        record.status === "success"
+                          ? "border-green-200 bg-green-50"
+                          : "border-red-200 bg-red-50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          {record.photoUrl ? (
+                            <img
+                              src={record.photoUrl}
+                              alt={record.studentName}
+                              className="w-10 h-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
+                              <User className="w-6 h-6 text-gray-600" />
+                            </div>
+                          )}
+                          {record.status === "success" ? (
+                            <CheckCircle className="w-5 h-5 text-green-600" />
+                          ) : (
+                            <XCircle className="w-5 h-5 text-red-600" />
+                          )}
+                          <p className="text-gray-900 font-medium">
+                            {record.studentName}
+                          </p>
+                        </div>
+                        <span className="text-gray-600 text-sm">
+                          {record.time}
+                        </span>
+                      </div>
+                      <p className="text-gray-600 text-sm mr-12">
+                        {record.studentId}
+                      </p>
+                      <p
+                        className={`text-sm mt-1 mr-12 ${
+                          record.status === "success"
+                            ? "text-green-700"
+                            : "text-red-700"
+                        }`}
+                      >
+                        {record.message}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right - Scanner */}
+        <div className="lg:col-span-1 order-2 lg:order-1">
+          <div className="bg-white rounded-lg shadow-lg p-8 sticky top-6">
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center w-24 h-24 bg-blue-100 rounded-full mb-6">
                 <Scan className="w-12 h-12 text-blue-600" />
               </div>
-              <h2 className="text-gray-900 mb-2">مسح باركود الطالب</h2>
-              <p className="text-gray-600">ضع الباركود أمام الماسح</p>
+              <h2 className="text-gray-900 mb-2 text-xl font-bold">
+                مسح باركود الطالب
+              </h2>
+              <p className="text-gray-600">أدخل الرقم القومي للطالب</p>
             </div>
 
-            <form onSubmit={handleBarcodeSubmit} className="max-w-md mx-auto">
-              <div className="mb-6">
-                <input
-                  type="text"
-                  value={barcodeInput}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setBarcodeInput(e.target.value)
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={barcodeInput}
+                onChange={(e) => setBarcodeInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleBarcodeSubmit(e as any);
                   }
-                  placeholder="أدخل أو امسح رقم الطالب..."
-                  className="w-full px-6 py-4 text-center border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  autoFocus
-                />
-              </div>
+                }}
+                placeholder="أدخل الرقم القومي..."
+                className="w-full px-6 py-4 text-center text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                autoFocus
+                disabled={isScanning}
+              />
               <button
-                type="submit"
-                className="w-full bg-blue-600 text-white py-4 rounded-lg hover:bg-blue-700 transition-colors"
+                onClick={handleBarcodeSubmit as any}
+                disabled={isScanning || !barcodeInput.trim()}
+                className="w-full bg-blue-600 text-white py-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold text-lg"
               >
-                معالجة المسح
+                {isScanning ? "جاري المسح..." : "معالجة المسح"}
               </button>
-            </form>
-          </div>
-        </div>
+            </div>
 
-        {/* Scan History */}
-        <div className="bg-white rounded-lg shadow-lg">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-gray-900">السجلات الأخيرة</h2>
-          </div>
-          <div className="p-4 max-h-[600px] overflow-y-auto">
-            <div className="space-y-3">
-              {scanHistory.map((record) => (
-                <div
-                  key={record.id}
-                  className={`p-4 rounded-lg border-2 ${
-                    record.status === "success"
-                      ? "border-green-200 bg-green-50"
-                      : "border-red-200 bg-red-50"
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      {record.status === "success" ? (
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                      ) : (
-                        <XCircle className="w-5 h-5 text-red-600" />
-                      )}
-                      <p className="text-gray-900">{record.studentName}</p>
-                    </div>
-                    <span className="text-gray-600 text-sm">{record.time}</span>
-                  </div>
-                  <p className="text-gray-600 text-sm">{record.studentId}</p>
-                  <p
-                    className={`text-sm mt-1 ${
-                      record.status === "success"
-                        ? "text-green-700"
-                        : "text-red-700"
-                    }`}
-                  >
-                    {record.message}
-                  </p>
-                </div>
-              ))}
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-900 font-semibold mb-2">
+                ملاحظات:
+              </p>
+              <ul className="text-xs text-blue-800 space-y-1">
+                <li>• يجب أن يكون الطالب من نفس السكن</li>
+                <li>• لا يمكن للطالب في إجازة تناول الوجبة</li>
+                <li>• وجبة واحدة فقط لكل نوع في اليوم</li>
+                <li>• يجب أن تكون ضمن ساعات الوجبة المحددة</li>
+              </ul>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Scan Result Modal */}
-      {showModal && modalData && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full">
-            <div
-              className={`p-6 rounded-t-lg ${
-                modalData.status === "success" ? "bg-green-500" : "bg-red-500"
-              }`}
-            >
-              <div className="flex items-center justify-center">
-                {modalData.status === "success" ? (
-                  <CheckCircle className="w-16 h-16 text-white" />
-                ) : modalData.message === "الطالب في إجازة" ? (
-                  <Calendar className="w-16 h-16 text-white" />
-                ) : (
-                  <XCircle className="w-16 h-16 text-white" />
-                )}
-              </div>
-            </div>
-
-            <div className="p-6">
-              <div className="text-center mb-6">
-                <h2
-                  className={`text-gray-900 mb-2 ${
-                    modalData.status === "success"
-                      ? "text-green-700"
-                      : "text-red-700"
-                  }`}
-                >
-                  {modalData.message}
-                </h2>
-                {modalData.status === "error" && (
-                  <div className="mt-4 p-4 bg-red-50 rounded-lg">
-                    <div className="flex items-center gap-2 justify-center text-red-700">
-                      <AlertTriangle className="w-5 h-5" />
-                      <span>يتطلب إجراء</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {modalData.name && (
-                <div className="space-y-4 mb-6">
-                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <User className="w-5 h-5 text-gray-600" />
-                    <div>
-                      <p className="text-gray-600 text-sm">اسم الطالب</p>
-                      <p className="text-gray-900">{modalData.name}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <User className="w-5 h-5 text-gray-600" />
-                    <div>
-                      <p className="text-gray-600 text-sm">رقم الطالب</p>
-                      <p className="text-gray-900">{modalData.studentId}</p>
-                    </div>
-                  </div>
-
-                  {modalData.building && (
-                    <>
-                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                        <Building className="w-5 h-5 text-gray-600" />
-                        <div>
-                          <p className="text-gray-600 text-sm">
-                            المبنى والغرفة
-                          </p>
-                          <p className="text-gray-900">
-                            {modalData.building} - {modalData.room}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                        <User className="w-5 h-5 text-gray-600" />
-                        <div>
-                          <p className="text-gray-600 text-sm">الكلية</p>
-                          <p className="text-gray-900">{modalData.faculty}</p>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              <button
-                onClick={() => setShowModal(false)}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                إغلاق
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
