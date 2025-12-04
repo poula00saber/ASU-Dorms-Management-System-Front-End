@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Upload, User, X } from "lucide-react";
 import { toast } from "sonner";
 import { API_BASE } from "../lib/api";
 
@@ -8,6 +8,10 @@ export default function StudentForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditMode = !!id;
+  const fileInputRef = useRef(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoUploaded, setPhotoUploaded] = useState(false); // ADD THIS LINE
 
   // Ain Shams University Faculties
   const ainShamsFaculties = [
@@ -30,7 +34,7 @@ export default function StudentForm() {
     "كلية الآثار",
     "كلية اللغات والترجمة",
     "كلية التربية الرياضية للبنين",
-    "كلية التربية الرياضية للبنات",
+    "كلية التربية الرياضية للبنين",
   ];
 
   // Grade options in Arabic
@@ -80,18 +84,23 @@ export default function StudentForm() {
   const [formData, setFormData] = useState({
     studentId: "",
     nationalId: "",
+    isEgyptian: true,
     firstName: "",
     lastName: "",
     status: 1,
     email: "",
     phoneNumber: "",
-    religion: 0,
+    religion: 1,
     government: "",
     district: "",
     streetName: "",
     faculty: "",
-    level: 0,
+    level: 1,
     grade: "",
+    percentageGrade: null,
+    secondarySchoolName: "",
+    secondarySchoolGovernment: "",
+    highSchoolPercentage: null,
     dormType: 1,
     buildingNumber: "",
     roomNumber: "",
@@ -109,29 +118,123 @@ export default function StudentForm() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
 
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
-  ) => {
+  const handleChange = (e) => {
     const { name, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+      [name]: type === "checkbox" ? e.target.checked : value,
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif"];
+    if (!validTypes.includes(file.type)) {
+      toast.error("الرجاء اختيار صورة بصيغة JPG, JPEG, PNG أو GIF");
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("حجم الصورة يجب أن يكون أقل من 5 ميجابايت");
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // Create preview URL
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreviewUrl(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadPhoto = async () => {
+    if (!selectedFile) {
+      toast.error("الرجاء اختيار صورة أولاً");
+      return;
+    }
+
+    if (!formData.studentId) {
+      toast.error("الرجاء إدخال رقم الملف أولاً");
+      return;
+    }
+
+    setUploadingPhoto(true);
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("لم يتم العثور على رمز المصادقة");
+        navigate("/");
+        return;
+      }
+
+      const formDataObj = new FormData();
+      formDataObj.append("file", selectedFile);
+
+      const response = await fetch(
+        `${API_BASE}/api/Students/${formData.studentId}/photo`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formDataObj,
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `خطأ في رفع الصورة: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const photoUrl = result.photoUrl;
+
+      // Update form data with the new photo URL
+      setFormData((prev) => ({
+        ...prev,
+        photoUrl: photoUrl,
+      }));
+
+      toast.success("تم رفع الصورة بنجاح");
+
+      // Clear selected file and preview
+      setPhotoUploaded(true); // ADD THIS LINE
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error) {
+      console.error("Error uploading photo:", error);
+      toast.error(error.message || "فشل رفع الصورة");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const removePhoto = () => {
+    setFormData((prev) => ({
+      ...prev,
+      photoUrl: "",
+    }));
+    setPreviewUrl(""); // ADD THIS
+    setPhotoUploaded(false); // ADD THIS
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       const token = localStorage.getItem("token");
-
-      console.log("=== SUBMIT DEBUG ===");
-      console.log("Token exists:", !!token);
 
       if (!token) {
         toast.error(
@@ -141,47 +244,62 @@ export default function StudentForm() {
         return;
       }
 
-      // Prepare the data
+      // Debug: Check what photoUrl we have
+      console.log("photoUrl before submission:", formData.photoUrl);
+      console.log("Is photoUrl empty?", !formData.photoUrl);
+      console.log("Is photoUrl null?", formData.photoUrl === null);
+
+      // Prepare the data - IMPORTANT: Send empty string instead of null for PhotoUrl
       const studentData = {
         studentId: formData.studentId,
         nationalId: formData.nationalId,
+        isEgyptian: formData.isEgyptian,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        status: parseInt(formData.status as any),
+        status: parseInt(formData.status),
         email: formData.email,
         phoneNumber: formData.phoneNumber,
-        religion: parseInt(formData.religion as any),
+        religion: parseInt(formData.religion),
         government: formData.government,
         district: formData.district,
-        streetName: formData.streetName,
+        streetName: formData.streetName || "", // Use empty string instead of null
         faculty: formData.faculty,
-        level: parseInt(formData.level as any),
+        level: parseInt(formData.level),
         grade: formData.grade,
-        dormType: parseInt(formData.dormType as any),
+        percentageGrade: formData.percentageGrade
+          ? parseFloat(formData.percentageGrade)
+          : null,
+        secondarySchoolName: formData.secondarySchoolName || "", // Use empty string instead of null
+        secondarySchoolGovernment: formData.secondarySchoolGovernment || "", // Use empty string instead of null
+        highSchoolPercentage: formData.highSchoolPercentage
+          ? parseFloat(formData.highSchoolPercentage)
+          : null,
+        dormType: parseInt(formData.dormType),
         buildingNumber: formData.buildingNumber,
         roomNumber: formData.roomNumber,
         hasSpecialNeeds: formData.hasSpecialNeeds,
-        specialNeedsDetails: formData.specialNeedsDetails || null,
+        specialNeedsDetails: formData.hasSpecialNeeds
+          ? formData.specialNeedsDetails || ""
+          : "", // Use empty string instead of null
         isExemptFromFees: formData.isExemptFromFees,
         fatherName: formData.fatherName,
         fatherNationalId: formData.fatherNationalId,
-        fatherProfession: formData.fatherProfession,
+        fatherProfession: formData.fatherProfession || "", // Use empty string instead of null
         fatherPhone: formData.fatherPhone,
         guardianName: formData.guardianName,
         guardianRelationship: formData.guardianRelationship,
         guardianPhone: formData.guardianPhone,
-        photoUrl: formData.photoUrl || null,
+        photoUrl: formData.photoUrl || "", // Use empty string instead of null
       };
 
-      console.log("Student data:", studentData);
+      console.log("Student data being sent:", studentData);
+      console.log("PhotoUrl in data:", studentData.photoUrl);
 
       const url = isEditMode
         ? `${API_BASE}/api/Students/${id}`
         : `${API_BASE}/api/Students`;
 
       const method = isEditMode ? "PUT" : "POST";
-
-      console.log(`Making ${method} request to:`, url);
 
       const response = await fetch(url, {
         method: method,
@@ -207,7 +325,7 @@ export default function StudentForm() {
         isEditMode ? "تم تحديث بيانات الطالب بنجاح!" : "تم إنشاء الطالب بنجاح!"
       );
       navigate("/students");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error saving student:", error);
       toast.error(error.message || "فشل حفظ بيانات الطالب");
     } finally {
@@ -243,18 +361,23 @@ export default function StudentForm() {
         setFormData({
           studentId: data.studentId || "",
           nationalId: data.nationalId || "",
+          isEgyptian: data.isEgyptian ?? true,
           firstName: data.firstName || "",
           lastName: data.lastName || "",
           status: data.status ?? 1,
           email: data.email || "",
           phoneNumber: data.phoneNumber || "",
-          religion: data.religion ?? 0,
+          religion: data.religion ?? 1,
           government: data.government || "",
           district: data.district || "",
           streetName: data.streetName || "",
           faculty: data.faculty || "",
-          level: data.level || 0,
+          level: data.level || 1,
           grade: data.grade || "",
+          percentageGrade: data.percentageGrade || null,
+          secondarySchoolName: data.secondarySchoolName || "",
+          secondarySchoolGovernment: data.secondarySchoolGovernment || "",
+          highSchoolPercentage: data.highSchoolPercentage || null,
           dormType: data.dormType || 1,
           buildingNumber: data.buildingNumber || "",
           roomNumber: data.roomNumber || "",
@@ -270,7 +393,7 @@ export default function StudentForm() {
           guardianPhone: data.guardianPhone || "",
           photoUrl: data.photoUrl || "",
         });
-      } catch (error: any) {
+      } catch (error) {
         console.error("Error fetching student:", error);
         toast.error(error.message || "فشل تحميل بيانات الطالب");
       }
@@ -278,6 +401,8 @@ export default function StudentForm() {
 
     fetchStudent();
   }, [id, isEditMode, navigate]);
+
+  const isNewStudent = parseInt(formData.status) === 1;
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -305,6 +430,96 @@ export default function StudentForm() {
       {/* Form */}
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow">
         <div className="p-6 space-y-8">
+          {/* Photo Upload Section - Moved to top */}
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              صورة الطالب
+            </h2>
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+              {/* Photo Preview */}
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  {previewUrl || formData.photoUrl ? (
+                    <div className="relative">
+                      <img
+                        src={
+                          previewUrl ||
+                          (formData.photoUrl &&
+                          formData.photoUrl.startsWith("http")
+                            ? formData.photoUrl
+                            : formData.photoUrl
+                            ? `${API_BASE}${formData.photoUrl}`
+                            : "")
+                        }
+                        alt="Preview"
+                        className="w-40 h-40 max-w-[160px] max-h-[160px] rounded-lg object-cover border-4 border-white shadow"
+                      />
+                      {photoUploaded && (
+                        <button
+                          type="button"
+                          onClick={removePhoto}
+                          className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="w-40 h-40 max-w-[160px] max-h-[160px] rounded-lg bg-blue-100 flex items-center justify-center border-4 border-white shadow">
+                      <User className="w-16 h-16 text-blue-600" />
+                    </div>
+                  )}
+                </div>
+
+                {/* File Input */}
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept="image/jpeg,image/jpg,image/png,image/gif"
+                    className="hidden"
+                    id="photo-upload"
+                  />
+                  <label
+                    htmlFor="photo-upload"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {selectedFile ? "تغيير الصورة" : "اختر صورة"}
+                  </label>
+
+                  {selectedFile && (
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">
+                        {selectedFile.name}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleUploadPhoto}
+                        disabled={uploadingPhoto}
+                        className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                      >
+                        {uploadingPhoto ? "جاري الرفع..." : "رفع الصورة"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="text-gray-600">
+                <p className="mb-2">متطلبات الصورة:</p>
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  <li>الصيغ المسموحة: JPG, JPEG, PNG, GIF</li>
+                  <li>الحجم الأقصى: 5 ميجابايت</li>
+                  <li>الأبعاد الموصى بها: 160×160 بيكسل</li>
+                  <li>يجب أن تكون الصورة واضحة ومواجهة للكاميرا</li>
+                  <li>خلفية موحدة (يفضل خلفية بيضاء)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
           {/* Basic Information */}
           <div>
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
@@ -346,6 +561,37 @@ export default function StudentForm() {
                   required
                   dir="ltr"
                 />
+              </div>
+
+              <div>
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    id="isEgyptian"
+                    name="isEgyptian"
+                    type="checkbox"
+                    checked={formData.isEgyptian}
+                    onChange={handleChange}
+                    className="form-checkbox h-5 w-5 text-blue-600"
+                  />
+                  <span>مصري الجنسية</span>
+                </label>
+              </div>
+
+              <div>
+                <label htmlFor="status" className="block text-gray-700 mb-2">
+                  حالة الطالب *
+                </label>
+                <select
+                  id="status"
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
+                  required
+                >
+                  <option value="1">طالب جديد</option>
+                  <option value="2">طالب قديم</option>
+                </select>
               </div>
 
               <div>
@@ -429,27 +675,9 @@ export default function StudentForm() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
                   required
                 >
-                  <option value="0">مسلم</option>
-                  <option value="1">مسيحي</option>
-                  <option value="2">أخرى</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="status" className="block text-gray-700 mb-2">
-                  حالة الطالب *
-                </label>
-                <select
-                  id="status"
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
-                  required
-                >
-                  <option value="0">- ادخل حالة الطالب - </option>
-                  <option value="1">طالب قديم</option>
-                  <option value="2">طالب جديد</option>
+                  <option value="1">مسلم</option>
+                  <option value="2">مسيحي</option>
+                  <option value="3">أخرى</option>
                 </select>
               </div>
             </div>
@@ -560,7 +788,6 @@ export default function StudentForm() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
                   required
                 >
-                  <option value="0">اختر الفرقة</option>
                   <option value="1">الفرقة الأولى</option>
                   <option value="2">الفرقة الثانية</option>
                   <option value="3">الفرقة الثالثة</option>
@@ -590,8 +817,106 @@ export default function StudentForm() {
                   ))}
                 </select>
               </div>
+
+              <div>
+                <label
+                  htmlFor="percentageGrade"
+                  className="block text-gray-700 mb-2"
+                >
+                  النسبة المئوية للدرجة
+                </label>
+                <input
+                  id="percentageGrade"
+                  name="percentageGrade"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={formData.percentageGrade || ""}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
+                  placeholder="85.5"
+                  dir="ltr"
+                />
+              </div>
             </div>
           </div>
+
+          {/* Secondary School Information (for New Students) */}
+          {isNewStudent && (
+            <div className="pt-6 border-t border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                معلومات الثانوية العامة (للطلاب الجدد)
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label
+                    htmlFor="secondarySchoolName"
+                    className="block text-gray-700 mb-2"
+                  >
+                    اسم المدرسة الثانوية *
+                  </label>
+                  <input
+                    id="secondarySchoolName"
+                    name="secondarySchoolName"
+                    type="text"
+                    value={formData.secondarySchoolName}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
+                    placeholder="مدرسة عين شمس الثانوية"
+                    required={isNewStudent}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="secondarySchoolGovernment"
+                    className="block text-gray-700 mb-2"
+                  >
+                    محافظة المدرسة الثانوية *
+                  </label>
+                  <select
+                    id="secondarySchoolGovernment"
+                    name="secondarySchoolGovernment"
+                    value={formData.secondarySchoolGovernment}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
+                    required={isNewStudent}
+                  >
+                    <option value="">اختر المحافظة</option>
+                    {uniqueGovernorates.map((governorate, index) => (
+                      <option key={index} value={governorate}>
+                        {governorate}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="highSchoolPercentage"
+                    className="block text-gray-700 mb-2"
+                  >
+                    النسبة المئوية للثانوية العامة *
+                  </label>
+                  <input
+                    id="highSchoolPercentage"
+                    name="highSchoolPercentage"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={formData.highSchoolPercentage || ""}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
+                    placeholder="92.5"
+                    required={isNewStudent}
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Accommodation Information */}
           <div className="pt-6 border-t border-gray-200">
@@ -876,22 +1201,6 @@ export default function StudentForm() {
                   <span>معفى من الرسوم</span>
                 </label>
               </div>
-
-              <div className="md:col-span-2">
-                <label htmlFor="photoUrl" className="block text-gray-700 mb-2">
-                  رابط الصورة
-                </label>
-                <input
-                  id="photoUrl"
-                  name="photoUrl"
-                  type="text"
-                  value={formData.photoUrl}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
-                  placeholder="/uploads/photos/student.jpg"
-                  dir="ltr"
-                />
-              </div>
             </div>
           </div>
         </div>
@@ -902,14 +1211,14 @@ export default function StudentForm() {
             type="button"
             onClick={() => navigate("/students")}
             className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-            disabled={loading}
+            disabled={loading || uploadingPhoto}
           >
             إلغاء
           </button>
           <button
             type="submit"
             className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={loading}
+            disabled={loading || uploadingPhoto}
           >
             <Save className="w-5 h-5" />
             {loading

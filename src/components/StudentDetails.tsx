@@ -199,21 +199,37 @@ export default function StudentDetails() {
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             {student.photoUrl ? (
-              <img
-                src={
-                  student.photoUrl.startsWith("http")
-                    ? student.photoUrl
-                    : `${API_BASE}${student.photoUrl}`
-                }
-                alt={`${student.firstName} ${student.lastName}`}
-                className="w-32 h-32 rounded-lg object-cover border-4 border-white shadow"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src =
-                    "https://via.placeholder.com/128x128/3B82F6/FFFFFF?text=صورة";
-                }}
-              />
+              <div className="relative">
+                <img
+                  src={
+                    student.photoUrl.startsWith("http")
+                      ? student.photoUrl
+                      : `${API_BASE}${student.photoUrl}`
+                  }
+                  alt={`${student.firstName} ${student.lastName}`}
+                  className="w-40 h-40 rounded-lg object-cover border-4 border-white shadow"
+                  style={{
+                    maxWidth: "160px",
+                    maxHeight: "160px",
+                    width: "160px",
+                    height: "160px",
+                  }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      "https://via.placeholder.com/160x160/3B82F6/FFFFFF?text=صورة";
+                  }}
+                />
+              </div>
             ) : (
-              <div className="w-32 h-32 rounded-lg bg-blue-100 flex items-center justify-center border-4 border-white shadow">
+              <div
+                className="w-40 h-40 rounded-lg bg-blue-100 flex items-center justify-center border-4 border-white shadow"
+                style={{
+                  maxWidth: "160px",
+                  maxHeight: "160px",
+                  width: "160px",
+                  height: "160px",
+                }}
+              >
                 <User className="w-16 h-16 text-blue-600" />
               </div>
             )}
