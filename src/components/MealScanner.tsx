@@ -29,7 +29,9 @@ interface StudentData {
   firstName: string;
   lastName: string;
   buildingNumber: string;
+  timeScanned: string;
   photoUrl?: string;
+  previousScanTime?: string; // Add this to track previous scan time
 }
 
 interface ScanResult {
@@ -77,6 +79,25 @@ export default function MealScanner({ mealType }: MealScannerProps) {
     return `${API_BASE}${relativePath}`;
   };
 
+  const formatTimeToEgyptian = (dateString?: string) => {
+    if (!dateString) return "";
+
+    const date = new Date(dateString);
+    return date.toLocaleTimeString("ar-EG", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
+  const getCurrentTimeFormatted = () => {
+    return currentTime.toLocaleTimeString("ar-EG", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
   const handleScan = async (nationalId: string) => {
     if (!nationalId.trim()) return;
 
@@ -105,6 +126,17 @@ export default function MealScanner({ mealType }: MealScannerProps) {
         data.student.photoUrl = getFullPhotoUrl(data.student.photoUrl);
       }
 
+      // Format the time display based on scan result
+      if (data.student) {
+        // Format the timeScanned from backend to Egyptian format
+        if (data.student.timeScanned) {
+          data.student.time = formatTimeToEgyptian(data.student.timeScanned);
+        } else {
+          // Fallback to current time if timeScanned is not provided
+          data.student.time = getCurrentTimeFormatted();
+        }
+      }
+
       setScanResult(data);
 
       if (data.student) {
@@ -112,10 +144,7 @@ export default function MealScanner({ mealType }: MealScannerProps) {
           id: Date.now(),
           studentId: data.student.studentId,
           studentName: `${data.student.firstName} ${data.student.lastName}`,
-          time: currentTime.toLocaleTimeString("ar-EG", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
+          time: data.student.time || getCurrentTimeFormatted(), // Use the formatted time
           status: data.success ? "success" : "error",
           message: data.message,
           photoUrl: data.student.photoUrl,
@@ -181,13 +210,7 @@ export default function MealScanner({ mealType }: MealScannerProps) {
               <Clock className="w-6 h-6" />
               <p className="text-blue-100">الوقت الحالي</p>
             </div>
-            <p className="text-white">
-              {currentTime.toLocaleTimeString("en-US", {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-              })}
-            </p>
+            <p className="text-white">{getCurrentTimeFormatted()}</p>
             <p className="text-blue-100 text-sm mt-1">
               {currentTime.toLocaleDateString("ar-EG", {
                 weekday: "long",
@@ -212,7 +235,6 @@ export default function MealScanner({ mealType }: MealScannerProps) {
                     <img
                       src={scanResult.student.photoUrl}
                       alt={`${scanResult.student.firstName} ${scanResult.student.lastName}`}
-                      // width left same as w-64 (256px) and reduce height by 3px (253px).
                       className="w-64 rounded-2xl object-cover border-4 border-gray-200 shadow-lg relative"
                       style={{ height: "253px", left: "-2px" }}
                     />
@@ -254,35 +276,58 @@ export default function MealScanner({ mealType }: MealScannerProps) {
                         </h3>
                       </div>
                       <span className="text-gray-500 text-sm">
-                        {currentTime.toLocaleTimeString("ar-EG", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {getCurrentTimeFormatted()}
                       </span>
                     </div>
                   </div>
 
                   {/* Student Name */}
-                  <div>
-                    <h4 className="text-3xl font-bold text-gray-900">
-                      {scanResult.student.firstName}{" "}
-                      {scanResult.student.lastName}
-                    </h4>
-                    <p className="text-xl text-gray-600 mt-2">
-                      {scanResult.student.studentId}
-                    </p>
+                  <div className="bg-gray-50 p-5 rounded-lg" dir="rtl">
+                    <div className="flex flex-row-reverse items-center gap-3">
+                      <div className="text-right" dir="rtl">
+                        <h4 className="text-3xl font-bold text-gray-900">
+                          {scanResult.student.firstName}{" "}
+                          {scanResult.student.lastName}
+                        </h4>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 p-5 rounded-lg" dir="rtl">
+                      <div className="flex flex-row-reverse items-center gap-3">
+                        <p className="text-xl text-gray-600 mt-2">
+                          {scanResult.student.studentId}
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Building Info */}
-                  <div className="bg-gray-50 p-5 rounded-lg">
-                    <div className="flex items-center gap-3">
+                  <div className="bg-gray-50 p-5 rounded-lg" dir="rtl">
+                    <div className="flex flex-row-reverse items-center gap-3">
                       <Building className="w-6 h-6 text-gray-600" />
-                      <div>
+                      <div className="text-right">
                         <p className="text-sm text-gray-600 font-medium">
                           المبنى
                         </p>
                         <p className="text-xl text-gray-900 font-bold">
                           {scanResult.student.buildingNumber}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Time Scan Info - This is the main change */}
+                  <div className="bg-gray-50 p-5 rounded-lg" dir="rtl">
+                    <div className="flex flex-row-reverse items-center gap-3">
+                      <Clock className="w-6 h-6 text-gray-600" />
+                      <div className="text-right">
+                        <p className="text-sm text-gray-600 font-medium">
+                          {scanResult.success
+                            ? "تم المسح الآن في الساعة"
+                            : "تم المسح مسبقًا في الساعة"}
+                        </p>
+                        <p className="text-xl text-gray-900 font-bold">
+                          {scanResult.student.time}
                         </p>
                       </div>
                     </div>
