@@ -525,7 +525,7 @@ export default function MealScanner({ mealType }: MealScannerProps) {
                   onChange={handleInputChange}
                   onFocus={handleInputFocus}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter"&& !iskeyboardEvent(e)) {
+                    if (e.key === "Enter") {
                       e.preventDefault();
                       handleBarcodeSubmit(e as any);
                     }
