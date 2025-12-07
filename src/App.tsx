@@ -15,6 +15,7 @@ import HolidayManager from "./components/HolidayManagerFinal";
 import Reports from "./components/Reports";
 import MealScanner from "./components/MealScanner";
 import ProtectedRoute from "./components/ProtectedRoute";
+import PaymentManagerArabic from "./components/Payment Manager";
 import { Toaster } from "sonner";
 
 export type UserRole = "registration" | "restaurant" | null;
@@ -101,6 +102,16 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              {/* ADD THIS ROUTE - Payments Management */}
+              <Route
+                path="/payments"
+                element={
+                  <ProtectedRoute allowedRoles={["registration"]}>
+                    <PaymentManagerArabic />
+                  </ProtectedRoute>
+                }
+              />
+
               <Route
                 path="/reports"
                 element={

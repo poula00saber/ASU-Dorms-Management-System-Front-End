@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { API_BASE } from "../lib/api";
 import {
   Scan,
@@ -31,7 +31,7 @@ interface StudentData {
   buildingNumber: string;
   timeScanned: string;
   photoUrl?: string;
-  previousScanTime?: string; // Add this to track previous scan time
+  previousScanTime?: string;
 }
 
 interface ScanResult {
@@ -46,13 +46,62 @@ export default function MealScanner({ mealType }: MealScannerProps) {
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanRecord[]>([]);
   const [isScanning, setIsScanning] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Track the last scan time to prevent rapid rescans
+  const lastScanTimeRef = useRef<number>(0);
+  const SCAN_COOLDOWN_MS = 1000; // 1 second cooldown between scans
 
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
+
+    // Auto-focus the input on component mount
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+
     return () => clearInterval(timer);
   }, []);
+
+  // Effect to handle automatic scanning when barcode input changes
+  useEffect(() => {
+    const handleAutoScan = async () => {
+      // Don't scan if input is empty
+      if (!barcodeInput.trim()) return;
+
+      // Check if enough time has passed since last scan
+      const now = Date.now();
+      if (now - lastScanTimeRef.current < SCAN_COOLDOWN_MS) return;
+
+      // Check if input looks like a barcode (usually ends with Enter or Tab)
+      // For barcode scanners, they often append special characters
+      // Let's check for minimum length (e.g., at least 5 characters)
+      if (barcodeInput.length >= 5) {
+        await performScan(barcodeInput.trim());
+        setBarcodeInput(""); // Clear input after scanning
+      }
+    };
+
+    // Use a debounce to handle barcode scanner input
+    const timer = setTimeout(() => {
+      handleAutoScan();
+    }, 150); // Reduced debounce time for faster scanning
+
+    return () => clearTimeout(timer);
+  }, [barcodeInput]);
+
+  useEffect(() => {
+    // Re-focus input after scan is complete and result is displayed
+    if (!isScanning && scanResult && inputRef.current) {
+      // Small delay to ensure UI has updated
+      setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select(); // Select all text for quick clearing
+      }, 100);
+    }
+  }, [isScanning, scanResult]);
 
   const getMealInfo = () => {
     const hour = currentTime.getHours();
@@ -98,8 +147,11 @@ export default function MealScanner({ mealType }: MealScannerProps) {
     });
   };
 
-  const handleScan = async (nationalId: string) => {
+  const performScan = async (nationalId: string) => {
     if (!nationalId.trim()) return;
+
+    // Update last scan time
+    lastScanTimeRef.current = Date.now();
 
     setIsScanning(true);
 
@@ -126,13 +178,10 @@ export default function MealScanner({ mealType }: MealScannerProps) {
         data.student.photoUrl = getFullPhotoUrl(data.student.photoUrl);
       }
 
-      // Format the time display based on scan result
       if (data.student) {
-        // Format the timeScanned from backend to Egyptian format
         if (data.student.timeScanned) {
           data.student.time = formatTimeToEgyptian(data.student.timeScanned);
         } else {
-          // Fallback to current time if timeScanned is not provided
           data.student.time = getCurrentTimeFormatted();
         }
       }
@@ -144,7 +193,7 @@ export default function MealScanner({ mealType }: MealScannerProps) {
           id: Date.now(),
           studentId: data.student.studentId,
           studentName: `${data.student.firstName} ${data.student.lastName}`,
-          time: data.student.time || getCurrentTimeFormatted(), // Use the formatted time
+          time: data.student.time || getCurrentTimeFormatted(),
           status: data.success ? "success" : "error",
           message: data.message,
           photoUrl: data.student.photoUrl,
@@ -172,15 +221,38 @@ export default function MealScanner({ mealType }: MealScannerProps) {
   const handleBarcodeSubmit = (e: React.FormEvent | any) => {
     e?.preventDefault?.();
     if (barcodeInput.trim()) {
-      handleScan(barcodeInput.trim());
+      performScan(barcodeInput.trim());
       setBarcodeInput("");
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setBarcodeInput(value);
+
+    // If input is cleared, reset scan result background after a delay
+    if (!value.trim()) {
+      setTimeout(() => {
+        setScanResult(null);
+      }, 1000);
+    }
+  };
+
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Select all text when input is focused
+    e.target.select();
+  };
+
+  const handleContainerClick = () => {
+    // Focus input when clicking anywhere in the scanner container
+    if (inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
     }
   };
 
   const mealInfo = getMealInfo();
 
-  // Page-level background classes based on scan result:
-  // default: white, success: green, error: red
   const pageBgClass = scanResult
     ? scanResult.success
       ? "bg-green-100"
@@ -316,7 +388,7 @@ export default function MealScanner({ mealType }: MealScannerProps) {
                     </div>
                   </div>
 
-                  {/* Time Scan Info - This is the main change */}
+                  {/* Time Scan Info */}
                   <div className="bg-gray-50 p-5 rounded-lg" dir="rtl">
                     <div className="flex flex-row-reverse items-center gap-3">
                       <Clock className="w-6 h-6 text-gray-600" />
@@ -421,7 +493,10 @@ export default function MealScanner({ mealType }: MealScannerProps) {
 
         {/* Right - Scanner */}
         <div className="lg:col-span-1 order-2 lg:order-1">
-          <div className="bg-white rounded-lg shadow-lg p-8 sticky top-6">
+          <div
+            className="bg-white rounded-lg shadow-lg p-8 sticky top-6"
+            onClick={handleContainerClick}
+          >
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center w-24 h-24 bg-blue-100 rounded-full mb-6">
                 <Scan className="w-12 h-12 text-blue-600" />
@@ -429,43 +504,66 @@ export default function MealScanner({ mealType }: MealScannerProps) {
               <h2 className="text-gray-900 mb-2 text-xl font-bold">
                 مسح باركود الطالب
               </h2>
-              <p className="text-gray-600">أدخل الرقم القومي للطالب</p>
+              <p className="text-gray-600">قم بتوجيه الباركود سكانر هنا</p>
+              <div className="mt-2 text-sm text-gray-500">
+                {isScanning ? (
+                  <span className="text-blue-600">جاري المسح...</span>
+                ) : (
+                  <span className="text-green-600 font-semibold">
+                    جاهز للمسح
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="space-y-4">
-              <input
-                type="text"
-                value={barcodeInput}
-                onChange={(e) => setBarcodeInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleBarcodeSubmit(e as any);
-                  }
-                }}
-                placeholder="أدخل الرقم القومي..."
-                className="w-full px-6 py-4 text-center text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                autoFocus
-                disabled={isScanning}
-              />
+              <div className="relative">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={barcodeInput}
+                  onChange={handleInputChange}
+                  onFocus={handleInputFocus}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter"&& !iskeyboardEvent(e)) {
+                      e.preventDefault();
+                      handleBarcodeSubmit(e as any);
+                    }
+                  }}
+                  placeholder="انقر هنا أو مرر الباركود"
+                  className="w-full px-6 py-4 text-center text-lg border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-blue-50"
+                  autoFocus
+                  disabled={isScanning}
+                  autoComplete="off"
+                  spellCheck="false"
+                />
+                <div className="absolute top-1/2 right-3 transform -translate-y-1/2">
+                  {isScanning ? (
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <Scan className="w-5 h-5 text-blue-500" />
+                  )}
+                </div>
+              </div>
               <button
                 onClick={handleBarcodeSubmit as any}
                 disabled={isScanning || !barcodeInput.trim()}
                 className="w-full bg-blue-600 text-white py-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold text-lg"
               >
-                {isScanning ? "جاري المسح..." : "معالجة المسح"}
+                {isScanning ? "جاري المسح..." : "معالجة المسح (Enter)"}
               </button>
             </div>
 
             <div className="mt-6 p-4 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-900 font-semibold mb-2">
-                ملاحظات:
+                تعليمات المسح:
               </p>
               <ul className="text-xs text-blue-800 space-y-1">
-                <li>• يجب أن يكون الطالب من نفس السكن</li>
-                <li>• لا يمكن للطالب في إجازة تناول الوجبة</li>
-                <li>• وجبة واحدة فقط لكل نوع في اليوم</li>
-                <li>• يجب أن تكون ضمن ساعات الوجبة المحددة</li>
+                <li>• الحقل جاهز للمسح تلقائياً عند فتح الصفحة</li>
+                <li>• انقر في أي مكان داخل هذا المربع لتفعيل الحقل</li>
+                <li>• مرر الباركود وسيتم المسح تلقائياً</li>
+                <li>• الحقل سيتم تفريغه تلقائياً بعد كل مسح</li>
+                <li>• جاهز للمسح التالي فوراً</li>
               </ul>
             </div>
           </div>

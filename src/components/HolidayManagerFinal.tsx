@@ -107,7 +107,7 @@ export default function HolidayManagerArabic() {
     try {
       const token = localStorage.getItem("token");
       const payload = {
-        studentId: selectedStudent.studentId,
+        studentNationalId: selectedStudent.nationalId, // CHANGED: Send nationalId
         startDate: formData.startDate,
         endDate: formData.endDate,
       };
@@ -126,7 +126,7 @@ export default function HolidayManagerArabic() {
       alert("تمت إضافة الإجازة بنجاح");
       setShowModal(false);
       setFormData({ startDate: "", endDate: "" });
-      fetchStudentHolidays(selectedStudent.studentId);
+      fetchStudentHolidays(selectedStudent.studentId); // Still use studentId for fetching
     } catch (err: any) {
       alert(err.message || "حدث خطأ أثناء إضافة الإجازة");
     }

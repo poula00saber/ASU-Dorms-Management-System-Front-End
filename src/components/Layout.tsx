@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   Utensils,
+  CreditCard,
 } from "lucide-react";
 import { UserRole } from "../App";
 
@@ -28,6 +29,7 @@ export default function Layout({ children, userRole, onLogout }: LayoutProps) {
   const registrationMenu = [
     { icon: LayoutDashboard, label: "لوحة التحكم", path: "/" },
     { icon: Users, label: "الطلاب", path: "/students" },
+    { icon: CreditCard, label: "المدفوعات", path: "/payments" },
     { icon: Calendar, label: "الإجازات", path: "/holidays" },
     { icon: FileText, label: "التقارير", path: "/reports" },
   ];
@@ -154,7 +156,7 @@ export default function Layout({ children, userRole, onLogout }: LayoutProps) {
       )}
 
       {/* Main Content */}
-      <div className="md:pl-64">
+      <div className="md:pl-64 h-screen overflow-y-auto">
         {/* Top Bar */}
         <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
           <div className="flex items-center justify-between px-4 md:px-8 py-4">
@@ -162,12 +164,10 @@ export default function Layout({ children, userRole, onLogout }: LayoutProps) {
               <Menu className="w-6 h-6 text-gray-600" />
             </button>
 
-            <div className="flex-1 md:flex-none">
-              <h1 className="text-gray-900 ml-4 md:ml-0">
-                {menuItems.find((item) => item.path === location.pathname)
-                  ?.label || "لوحة التحكم"}
-              </h1>
-            </div>
+            <h1 className="text-gray-900">
+              {menuItems.find((item) => item.path === location.pathname)
+                ?.label || "لوحة التحكم"}
+            </h1>
 
             <div className="flex items-center gap-4">
               <div className="text-right hidden sm:block">
@@ -190,7 +190,7 @@ export default function Layout({ children, userRole, onLogout }: LayoutProps) {
         </header>
 
         {/* Page Content */}
-        <main className="p-4 md:p-8">{children}</main>
+        <main className="p-4 md:p-8 mt-4">{children}</main>
       </div>
     </div>
   );
