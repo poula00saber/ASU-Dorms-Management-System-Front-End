@@ -52,6 +52,11 @@ export default function MealScanner({ mealType }: MealScannerProps) {
   const lastScanTimeRef = useRef<number>(0);
   const SCAN_COOLDOWN_MS = 1000; // 1 second cooldown between scans
 
+  // Track last input time to detect scanner vs manual input
+  const lastInputTimeRef = useRef<number>(0);
+  const MIN_SCANNER_SPEED_MS = 50; // Scanner inputs are very fast (< 50ms between chars)
+  const MAX_MANUAL_CHARS = 4; // Maximum allowed manual characters
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -75,12 +80,17 @@ export default function MealScanner({ mealType }: MealScannerProps) {
       const now = Date.now();
       if (now - lastScanTimeRef.current < SCAN_COOLDOWN_MS) return;
 
-      // Check if input looks like a barcode (usually ends with Enter or Tab)
-      // For barcode scanners, they often append special characters
-      // Let's check for minimum length (e.g., at least 5 characters)
-      if (barcodeInput.length >= 5) {
+      // Check if this looks like scanner input (fast and long enough)
+      const inputLength = barcodeInput.length;
+      const isLikelyScanner = inputLength >= 5;
+
+      if (isLikelyScanner) {
         await performScan(barcodeInput.trim());
         setBarcodeInput(""); // Clear input after scanning
+      } else {
+        // If it's short input (manual typing), clear it
+        toast.error("الرجاء استخدام الماسح الضوئي فقط");
+        setBarcodeInput("");
       }
     };
 
@@ -107,7 +117,7 @@ export default function MealScanner({ mealType }: MealScannerProps) {
     const hour = currentTime.getHours();
 
     if (mealType === "breakfast-dinner") {
-      if (hour >= 0 && hour < 2) {
+      if (hour >= 18 && hour < 21) {
         return { name: "عشاء", time: "6:00 PM - 9:00 PM", active: true };
       }
       return {
@@ -228,7 +238,22 @@ export default function MealScanner({ mealType }: MealScannerProps) {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    const now = Date.now();
+    const timeSinceLastInput = now - lastInputTimeRef.current;
+
+    // Detect if this is likely manual typing (slow) vs scanner (fast)
+    // Scanners input very quickly (< 50ms between characters)
+    const isLikelyManual = timeSinceLastInput > MIN_SCANNER_SPEED_MS;
+
+    if (isLikelyManual && value.length > MAX_MANUAL_CHARS) {
+      // This is likely manual typing or copy-paste of full national ID
+      toast.error("الرجاء استخدام الماسح الضوئي فقط - لا يسمح بالإدخال اليدوي");
+      setBarcodeInput("");
+      return;
+    }
+
     setBarcodeInput(value);
+    lastInputTimeRef.current = now;
 
     // If input is cleared, reset scan result background after a delay
     if (!value.trim()) {
@@ -248,6 +273,57 @@ export default function MealScanner({ mealType }: MealScannerProps) {
     if (inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
+    }
+  };
+
+  // Completely prevent paste
+  const handleInputPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    toast.error("لا يسمح بلصق البيانات. يرجى استخدام الماسح الضوئي فقط.");
+  };
+
+  // Prevent copy as well
+  const handleInputCopy = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+  };
+
+  // Prevent cut
+  const handleInputCut = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+  };
+
+  // Handle keyboard input to detect manual typing
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Allow only digits for scanner input
+    const isDigit = /^\d$/.test(e.key);
+    const isControlKey = [
+      "Backspace",
+      "Delete",
+      "Tab",
+      "Escape",
+      "Enter",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowDown",
+      "Home",
+      "End",
+    ].includes(e.key);
+
+    if (!isDigit && !isControlKey && e.key.length === 1) {
+      e.preventDefault();
+      toast.error("يسمح بإدخال الأرقام فقط للماسح الضوئي");
+      return;
+    }
+
+    // If Enter is pressed and input is less than 5 chars, prevent scan
+    if (e.key === "Enter" && barcodeInput.length < 5) {
+      e.preventDefault();
+      toast.error(
+        "الرجاء استخدام الماسح الضوئي - يجب أن يكون الباركود 5 أرقام على الأقل"
+      );
+      setBarcodeInput("");
+      return;
     }
   };
 
@@ -504,7 +580,7 @@ export default function MealScanner({ mealType }: MealScannerProps) {
               <h2 className="text-gray-900 mb-2 text-xl font-bold">
                 مسح باركود الطالب
               </h2>
-              <p className="text-gray-600">قم بتوجيه الباركود سكانر هنا</p>
+              <p className="text-gray-600">استخدم الماسح الضوئي فقط</p>
               <div className="mt-2 text-sm text-gray-500">
                 {isScanning ? (
                   <span className="text-blue-600">جاري المسح...</span>
@@ -513,6 +589,9 @@ export default function MealScanner({ mealType }: MealScannerProps) {
                     جاهز للمسح
                   </span>
                 )}
+              </div>
+              <div className="mt-1 text-xs text-red-600 font-semibold">
+                لا يسمح بالإدخال اليدوي أو النسخ
               </div>
             </div>
 
@@ -524,18 +603,18 @@ export default function MealScanner({ mealType }: MealScannerProps) {
                   value={barcodeInput}
                   onChange={handleInputChange}
                   onFocus={handleInputFocus}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleBarcodeSubmit(e as any);
-                    }
-                  }}
-                  placeholder="انقر هنا أو مرر الباركود"
+                  onKeyDown={handleInputKeyDown}
+                  onPaste={handleInputPaste}
+                  onCopy={handleInputCopy}
+                  onCut={handleInputCut}
+                  placeholder="مرر الباركود هنا (الماسح فقط)"
                   className="w-full px-6 py-4 text-center text-lg border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-blue-50"
                   autoFocus
                   disabled={isScanning}
                   autoComplete="off"
                   spellCheck="false"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                 />
                 <div className="absolute top-1/2 right-3 transform -translate-y-1/2">
                   {isScanning ? (
@@ -547,7 +626,9 @@ export default function MealScanner({ mealType }: MealScannerProps) {
               </div>
               <button
                 onClick={handleBarcodeSubmit as any}
-                disabled={isScanning || !barcodeInput.trim()}
+                disabled={
+                  isScanning || !barcodeInput.trim() || barcodeInput.length < 5
+                }
                 className="w-full bg-blue-600 text-white py-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold text-lg"
               >
                 {isScanning ? "جاري المسح..." : "معالجة المسح (Enter)"}
@@ -559,13 +640,30 @@ export default function MealScanner({ mealType }: MealScannerProps) {
                 تعليمات المسح:
               </p>
               <ul className="text-xs text-blue-800 space-y-1">
-                <li>• الحقل جاهز للمسح تلقائياً عند فتح الصفحة</li>
-                <li>• انقر في أي مكان داخل هذا المربع لتفعيل الحقل</li>
+                <li>• استخدم الماسح الضوئي فقط</li>
+                <li>• لا يسمح بالإدخال اليدوي</li>
+                <li>• لا يسمح بنسخ ولصق البيانات</li>
                 <li>• مرر الباركود وسيتم المسح تلقائياً</li>
-                <li>• الحقل سيتم تفريغه تلقائياً بعد كل مسح</li>
                 <li>• جاهز للمسح التالي فوراً</li>
               </ul>
             </div>
+
+            {/* Input status display */}
+            {barcodeInput && (
+              <div className="mt-4 p-3 bg-gray-100 rounded-lg text-center">
+                <p className="text-xs text-gray-600 mb-1">
+                  {barcodeInput.length < 5
+                    ? "مدخلات غير كافية - استخدم الماسح الضوئي"
+                    : "باركود جاهز للمسح"}
+                </p>
+                <p className="text-sm font-mono bg-white p-2 rounded border">
+                  {barcodeInput}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  الطول: {barcodeInput.length} رقم
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

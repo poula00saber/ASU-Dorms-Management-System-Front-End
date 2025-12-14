@@ -598,7 +598,7 @@ export default function PaymentManagerArabic() {
                       className="bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                     >
                       <CreditCard className="w-5 h-5" />
-                      إضافة دفعة
+                      إضافة مدفوعات
                     </button>
                     <button
                       onClick={handleAddExemption}
@@ -1009,7 +1009,7 @@ export default function PaymentManagerArabic() {
                   onClick={handlePaymentSubmit}
                   className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
                 >
-                  إضافة الدفعة
+                  إضافة مدفوعات
                 </button>
               </div>
             </div>

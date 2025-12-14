@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { API_BASE } from "../lib/api";
+import { Bold } from "lucide-react";
 
 interface DashboardProps {
   userRole: "registration" | "restaurant";
@@ -108,6 +109,15 @@ function RegistrationDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>("");
+  const dormLocationMap: Record<number, string> = {
+    1: "مدينة طلبة العباسية",
+    2: "مدينة طالبات مصر الجديدة",
+    3: "مدينة نصر 1",
+    4: "مدينة نصر 2",
+    5: "زراعة أ",
+    6: "زراعة ب",
+    7: "الزيتون",
+  };
 
   useEffect(() => {
     fetchRegistrationData();
@@ -189,8 +199,8 @@ function RegistrationDashboard() {
             لوحة التحكم - التسجيل
           </h1>
           <p className="text-gray-600 mt-1">
-            موقع السكن: {stats.dormLocationId} | التاريخ:{" "}
-            {new Date(stats.date).toLocaleDateString("ar-EG")}
+            موقع السكن: {dormLocationMap[stats.dormLocationId] || "غير معروف"}|
+            التاريخ: {new Date(stats.date).toLocaleDateString("ar-EG")}
           </p>
         </div>
 

@@ -25,35 +25,47 @@ export default function Login({ onLogin }: LoginProps) {
       });
 
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Login failed");
+        const errorData = await res
+          .json()
+          .catch(() => ({ message: "Login failed" }));
+        throw new Error(errorData.message || "خطأ في تسجيل الدخول");
       }
 
       const data = await res.json();
 
-      // Normalize backend roles ("Restaurant" → "restaurant")
-      const roleFromApi: UserRole | undefined = data?.role
-        ? data.role.toLowerCase()
-        : undefined;
+      // Normalize backend roles to lowercase
+      // Backend returns: "Registration", "Restaurant", or "User"
+      // Frontend expects: "registration", "restaurant", or "user"
+      const roleFromApi = data?.role?.toLowerCase() as UserRole;
 
-      const role: UserRole = roleFromApi
-        ? (roleFromApi as UserRole)
-        : email.startsWith("rest_")
-        ? "restaurant"
-        : "registration";
-
-      const token = data?.token || null;
-
-      if (token) {
-       localStorage.setItem("token", token);
-       localStorage.setItem("role", role);
-
+      if (
+        !roleFromApi ||
+        !["registration", "restaurant", "user"].includes(roleFromApi)
+      ) {
+        throw new Error("Invalid role received from server");
       }
 
+      const token = data?.token;
+
+      if (!token) {
+        throw new Error("No token received from server");
+      }
+
+      // Store credentials
+      localStorage.setItem("token", token);
+      localStorage.setItem("role", roleFromApi);
+
+      // Store additional user data if provided
+      if (data.userId) localStorage.setItem("userId", data.userId);
+      if (data.username) localStorage.setItem("username", data.username);
+      if (data.dormLocationId)
+        localStorage.setItem("dormLocationId", data.dormLocationId);
+
       toast.success("تم تسجيل الدخول بنجاح!");
-      onLogin(role);
+      onLogin(roleFromApi);
     } catch (err: any) {
-      toast.error("خطأ في اسم المستخدم أو كلمة المرور");
+      console.error("Login error:", err);
+      toast.error(err.message || "خطأ في اسم المستخدم أو كلمة المرور");
     } finally {
       setLoading(false);
     }
@@ -84,7 +96,7 @@ export default function Login({ onLogin }: LoginProps) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="مثال: reg_location1"
+                  placeholder="أدخل اسم المستخدم"
                   required
                 />
               </div>
@@ -125,15 +137,21 @@ export default function Login({ onLogin }: LoginProps) {
             <div className="space-y-2 text-sm">
               <div className="bg-blue-50 p-3 rounded">
                 <p>
-                  <strong>التسجيل:</strong>
+                  <strong>التسجيل (إدارة):</strong>
                 </p>
-                <p>reg_location1 / أي كلمة مرور</p>
+                <p className="text-gray-700">reg_location1 / password</p>
               </div>
               <div className="bg-green-50 p-3 rounded">
                 <p>
                   <strong>المطعم:</strong>
                 </p>
-                <p>rest_location1 / أي كلمة مرور</p>
+                <p className="text-gray-700">rest_location1 / password</p>
+              </div>
+              <div className="bg-purple-50 p-3 rounded">
+                <p>
+                  <strong>مستخدم (إجازات فقط):</strong>
+                </p>
+                <p className="text-gray-700">user_location1 / password</p>
               </div>
             </div>
           </div>

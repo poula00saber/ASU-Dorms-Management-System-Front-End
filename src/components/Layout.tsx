@@ -14,7 +14,8 @@ import {
   Utensils,
   CreditCard,
 } from "lucide-react";
-import { UserRole } from "../App";
+
+export type UserRole = "registration" | "restaurant" | "user";
 
 interface LayoutProps {
   children: ReactNode;
@@ -44,8 +45,68 @@ export default function Layout({ children, userRole, onLogout }: LayoutProps) {
     { icon: Scan, label: "ماسح الغداء", path: "/scanner/lunch" },
   ];
 
+  const userMenu = [{ icon: Calendar, label: "الإجازات", path: "/holidays" }];
+
+  // Select menu based on role
   const menuItems =
-    userRole === "registration" ? registrationMenu : restaurantMenu;
+    userRole === "registration"
+      ? registrationMenu
+      : userRole === "restaurant"
+      ? restaurantMenu
+      : userMenu;
+
+  // Get role display name
+  const getRoleDisplayName = () => {
+    switch (userRole) {
+      case "registration":
+        return "لوحة الإدارة";
+      case "restaurant":
+        return "قسم المطعم";
+      case "user":
+        return "المستخدم";
+      default:
+        return "المستخدم";
+    }
+  };
+
+  const getUserRoleLabel = () => {
+    switch (userRole) {
+      case "registration":
+        return "المستخدم المسؤول";
+      case "restaurant":
+        return "موظف المطعم";
+      case "user":
+        return "مستخدم";
+      default:
+        return "مستخدم";
+    }
+  };
+
+  const getUserEmail = () => {
+    switch (userRole) {
+      case "registration":
+        return "admin@asu.edu";
+      case "restaurant":
+        return "restaurant@asu.edu";
+      case "user":
+        return "user@asu.edu";
+      default:
+        return "user@asu.edu";
+    }
+  };
+
+  const getUserInitials = () => {
+    switch (userRole) {
+      case "registration":
+        return "AU";
+      case "restaurant":
+        return "RU";
+      case "user":
+        return "U";
+      default:
+        return "U";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -57,9 +118,7 @@ export default function Layout({ children, userRole, onLogout }: LayoutProps) {
           </div>
           <div>
             <h2 className="text-blue-900">ASU Dorms</h2>
-            <p className="text-gray-500 text-xs">
-              {userRole === "registration" ? "لوحة الإدارة" : "قسم المطعم"}
-            </p>
+            <p className="text-gray-500 text-xs">{getRoleDisplayName()}</p>
           </div>
         </div>
 
@@ -111,7 +170,7 @@ export default function Layout({ children, userRole, onLogout }: LayoutProps) {
                 <div>
                   <h2 className="text-blue-900">ASU Dorms</h2>
                   <p className="text-gray-500 text-xs">
-                    {userRole === "registration" ? "المسؤول" : "قسم المطعم"}
+                    {getRoleDisplayName()}
                   </p>
                 </div>
               </div>
@@ -171,19 +230,11 @@ export default function Layout({ children, userRole, onLogout }: LayoutProps) {
 
             <div className="flex items-center gap-4">
               <div className="text-right hidden sm:block">
-                <p className="text-gray-900">
-                  {userRole === "registration"
-                    ? "المستخدم المسؤول"
-                    : "موظف المطعم"}
-                </p>
-                <p className="text-gray-500 text-sm">
-                  {userRole === "registration"
-                    ? "admin@asu.edu"
-                    : "restaurant@asu.edu"}
-                </p>
+                <p className="text-gray-900">{getUserRoleLabel()}</p>
+                <p className="text-gray-500 text-sm">{getUserEmail()}</p>
               </div>
               <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">
-                {userRole === "registration" ? "AU" : "RU"}
+                {getUserInitials()}
               </div>
             </div>
           </div>

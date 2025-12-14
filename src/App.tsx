@@ -7,7 +7,7 @@ import {
 } from "react-router-dom";
 import Login from "./components/Login";
 import Layout from "./components/Layout";
-import Dashboard from './components/Dashboard';
+import Dashboard from "./components/Dashboard";
 import StudentsList from "./components/StudentsList";
 import StudentForm from "./components/StudentForm";
 import StudentDetails from "./components/StudentDetails";
@@ -18,7 +18,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import PaymentManagerArabic from "./components/Payment Manager";
 import { Toaster } from "sonner";
 
-export type UserRole = "registration" | "restaurant" | null;
+export type UserRole = "registration" | "restaurant" | "user" | null;
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -59,9 +59,23 @@ function App() {
         <>
           <Layout userRole={userRole} onLogout={handleLogout}>
             <Routes>
-              <Route path="/" element={<Dashboard userRole={userRole} />} />
+              {/* Root route - redirect based on role */}
+              <Route
+                path="/"
+                element={
+                  userRole === "user" ? (
+                    <Navigate to="/holidays" replace />
+                  ) : userRole === "restaurant" ? (
+                    <Navigate to="/scanner/breakfast-dinner" replace />
+                  ) : (
+                    <ProtectedRoute allowedRoles={["registration"]}>
+                      <Dashboard userRole={userRole} />
+                    </ProtectedRoute>
+                  )
+                }
+              />
 
-              {/* Registration */}
+              {/* Registration Routes */}
               <Route
                 path="/students"
                 element={
@@ -94,15 +108,18 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+
+              {/* Holidays - accessible by both Registration and User roles */}
               <Route
                 path="/holidays"
                 element={
-                  <ProtectedRoute allowedRoles={["registration"]}>
+                  <ProtectedRoute allowedRoles={["registration", "user"]}>
                     <HolidayManager />
                   </ProtectedRoute>
                 }
               />
-              {/* ADD THIS ROUTE - Payments Management */}
+
+              {/* Payments - Registration only */}
               <Route
                 path="/payments"
                 element={
@@ -112,6 +129,7 @@ function App() {
                 }
               />
 
+              {/* Reports - Registration only */}
               <Route
                 path="/reports"
                 element={
@@ -121,7 +139,7 @@ function App() {
                 }
               />
 
-              {/* Restaurant */}
+              {/* Restaurant Routes */}
               <Route
                 path="/scanner/breakfast-dinner"
                 element={
@@ -139,7 +157,19 @@ function App() {
                 }
               />
 
-              <Route path="*" element={<Navigate to="/" replace />} />
+              {/* Catch all - redirect to appropriate home */}
+              <Route
+                path="*"
+                element={
+                  userRole === "user" ? (
+                    <Navigate to="/holidays" replace />
+                  ) : userRole === "restaurant" ? (
+                    <Navigate to="/scanner/breakfast-dinner" replace />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                }
+              />
             </Routes>
           </Layout>
 
