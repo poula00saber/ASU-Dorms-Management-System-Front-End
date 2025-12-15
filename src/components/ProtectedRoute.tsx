@@ -14,15 +14,12 @@ export default function ProtectedRoute({ children, allowedRoles }: Props) {
   if (!token) return <Navigate to="/login" replace />;
 
   // If no role restrictions, allow access
-  if (!allowedRoles) return children;
-
-  // Check if user's role is in the allowed roles list
   if (!allowedRoles.includes(role)) {
     // Redirect based on user's actual role
     if (role === "user") {
-      return <Navigate to="/holidays" replace />;
+      return <Navigate to="/payments" replace />; // Changed from "/holidays"
     } else if (role === "restaurant") {
-      return <Navigate to="/scanner/breakfast-dinner" replace />;
+      return <Navigate to="/restaurant-dashboard" replace />;
     } else if (role === "registration") {
       return <Navigate to="/" replace />;
     }

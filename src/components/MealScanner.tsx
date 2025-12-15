@@ -11,8 +11,10 @@ import {
 import { toast } from "sonner";
 
 interface MealScannerProps {
-  mealType: "breakfast-dinner" | "lunch";
+  mealType: "breakfast-dinner" | "lunch" | "combined";
 }
+
+
 
 interface ScanRecord {
   id: number;
@@ -113,25 +115,38 @@ export default function MealScanner({ mealType }: MealScannerProps) {
     }
   }, [isScanning, scanResult]);
 
-  const getMealInfo = () => {
-    const hour = currentTime.getHours();
+ const getMealInfo = () => {
+   const hour = currentTime.getHours();
 
-    if (mealType === "breakfast-dinner") {
-      if (hour >= 18 && hour < 21) {
-        return { name: "عشاء", time: "6:00 PM - 9:00 PM", active: true };
-      }
-      return {
-        name: "إفطار / عشاء",
-        time: "خارج ساعات الوجبات",
-        active: false,
-      };
-    } else {
-      if (hour >= 13 && hour < 24) {
-        return { name: "غداء", time: "1:00 PM - 9:00 PM", active: true };
-      }
-      return { name: "غداء", time: "خارج ساعات الوجبات", active: false };
-    }
-  };
+   if (mealType === "combined") {
+     if (hour >= 13 && hour < 21) {
+       return {
+         name: "مسح الوجبة (جميع الوجبات)",
+         time: "1:00 PM - 9:00 PM",
+         active: true,
+       };
+     }
+     return {
+       name: "مسح الوجبة (جميع الوجبات)",
+       time: "خارج ساعات الوجبات",
+       active: false,
+     };
+   } else if (mealType === "breakfast-dinner") {
+     if (hour >= 18 && hour < 21) {
+       return { name: "إفطار / عشاء", time: "6:00 PM - 9:00 PM", active: true };
+     }
+     return {
+       name: "إفطار / عشاء",
+       time: "خارج ساعات الوجبات",
+       active: false,
+     };
+   } else {
+     if (hour >= 13 && hour < 21) {
+       return { name: "غداء", time: "1:00 PM - 9:00 PM", active: true };
+     }
+     return { name: "غداء", time: "خارج ساعات الوجبات", active: false };
+   }
+ };
 
   const getFullPhotoUrl = (relativePath?: string) => {
     if (!relativePath) return undefined;
@@ -160,26 +175,36 @@ export default function MealScanner({ mealType }: MealScannerProps) {
   const performScan = async (nationalId: string) => {
     if (!nationalId.trim()) return;
 
-    // Update last scan time
     lastScanTimeRef.current = Date.now();
-
     setIsScanning(true);
 
     try {
       const token =
         localStorage.getItem("authToken") || localStorage.getItem("token");
-      const mealTypeId = mealType === "breakfast-dinner" ? 1 : 2;
 
-      const res = await fetch(`${API_BASE}/api/Meals/scan`, {
+      // Determine endpoint based on mealType
+      let endpoint: string;
+      let requestBody: any;
+
+      if (mealType === "combined") {
+        endpoint = `${API_BASE}/api/Meals/scan-combined`;
+        requestBody = { nationalId: nationalId.trim() };
+      } else {
+        endpoint = `${API_BASE}/api/Meals/scan`;
+        const mealTypeId = mealType === "breakfast-dinner" ? 1 : 2;
+        requestBody = {
+          nationalId: nationalId.trim(),
+          mealTypeId: mealTypeId,
+        };
+      }
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({
-          nationalId: nationalId.trim(),
-          mealTypeId: mealTypeId,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data: ScanResult = await res.json();
@@ -332,12 +357,12 @@ export default function MealScanner({ mealType }: MealScannerProps) {
   const pageBgClass = scanResult
     ? scanResult.success
       ? "bg-green-100"
-      : "bg-red-100"
+      : "bg-red-200"
     : "bg-white";
 
   return (
     <div
-      className={`space-y-6 min-h-screen transition-colors duration-300 ${pageBgClass}`}
+      className={`space-y-6 min-h-screen transition-colors duration-300 ${pageBgClass}`}// back ground col-form-label
     >
       {/* Header with Clock */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow-lg p-8 text-white">

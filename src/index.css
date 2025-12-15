@@ -1,4 +1,5 @@
 /*! tailwindcss v4.1.3 | MIT License | https://tailwindcss.com */
+
 @layer properties {
   @supports (((-webkit-hyphens: none)) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color: rgb(from red r g b)))) {
     *, :before, :after, ::backdrop {
@@ -52,34 +53,65 @@
   :root, :host {
     --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    
+ /* Add these missing colors used in your component */
+    
+    /* Green shades for gradients */
+    --color-green-500: oklch(0.723 0.219 149.579);
+    
+    /* Emerald color (green variant) */
+    --color-emerald-500: oklch(0.696 0.17 162.48);
+    
+    /* Gray shades for gradients */
+    --color-gray-500: oklch(0.551 0.027 264.364);
+    --color-gray-600: oklch(0.446 0.03 256.802);
+    
+    /* Yellow border */
+    --color-yellow-200: oklch(0.945 0.129 101.54);
+
+    /* Complete Red Scale - Added missing 300, 400, 800, 900 */
     --color-red-50: oklch(.971 .013 17.38);
     --color-red-100: oklch(.936 .032 17.717);
     --color-red-200: oklch(.885 .062 18.334);
     --color-red-500: oklch(.637 .237 25.331);
     --color-red-600: oklch(.577 .245 27.325);
     --color-red-700: oklch(.505 .213 27.518);
-    --color-orange-50: oklch(.98 .016 73.684);
-    --color-orange-100: oklch(.954 .038 75.164);
-    --color-orange-500: oklch(.705 .213 47.604);
-    --color-orange-600: oklch(.646 .222 41.116);
-    --color-orange-700: oklch(.553 .195 38.402);
-    --color-yellow-100: oklch(.973 .071 103.193);
-    --color-yellow-700: oklch(.554 .135 66.442);
+    --color-red-800: oklch(0.448 0.149 26.042);
+    --color-red-900: oklch(0.344 0.113 25.723);
+    
+    /* Complete Green Scale - Added missing 300, 400, 800, 900 */
     --color-green-50: oklch(.982 .018 155.826);
     --color-green-100: oklch(.962 .044 156.743);
     --color-green-200: oklch(.925 .084 155.995);
     --color-green-500: oklch(.723 .219 149.579);
     --color-green-600: oklch(.627 .194 149.214);
     --color-green-700: oklch(.527 .154 150.069);
+    --color-green-800: oklch(0.448 0.119 152.535);
+    --color-green-900: oklch(0.344 0.092 152.934);
+
+    --color-red-300: oklch(0.808 0.114 19.571);
+    --color-red-400: oklch(0.755 0.176 22.216);
+    
+    --color-green-300: oklch(0.851 0.119 151.328);
+    --color-green-400: oklch(0.802 0.154 150.081);
+    
+    --color-blue-200: oklch(0.882 0.059 254.128);
+    --color-blue-300: oklch(0.793 0.122 254.624);
+    --color-blue-400: oklch(0.708 0.165 254.624);
+    
+    /* Complete Blue Scale - Added missing 200, 300, 400, 800 */
     --color-blue-50: oklch(.97 .014 254.604);
     --color-blue-100: oklch(.932 .032 255.585);
+    --color-blue-200: oklch(0.882 0.059 254.128);
+    --color-blue-300: oklch(0.793 0.122 254.624);
+    --color-blue-400: oklch(0.708 0.165 254.624);
     --color-blue-500: oklch(.623 .214 259.815);
     --color-blue-600: oklch(.546 .245 262.881);
     --color-blue-700: oklch(.488 .243 264.376);
+    --color-blue-800: oklch(0.424 0.199 265.638);
     --color-blue-900: oklch(.379 .146 265.522);
-    --color-purple-50: oklch(.977 .014 308.299);
-    --color-purple-100: oklch(.946 .033 307.174);
-    --color-purple-700: oklch(.496 .265 301.924);
+    
+    /* Complete Gray Scale - Added missing 800 */
     --color-gray-50: oklch(.985 .002 247.839);
     --color-gray-100: oklch(.967 .003 264.542);
     --color-gray-200: oklch(.928 .006 264.531);
@@ -88,7 +120,45 @@
     --color-gray-500: oklch(.551 .027 264.364);
     --color-gray-600: oklch(.446 .03 256.802);
     --color-gray-700: oklch(.373 .034 259.733);
+    --color-gray-800: oklch(0.278 0.033 256.848);
     --color-gray-900: oklch(.21 .034 264.665);
+    
+    /* Complete Orange Scale - Added missing 200, 300, 400, 800, 900 */
+    --color-orange-50: oklch(.98 .016 73.684);
+    --color-orange-100: oklch(.954 .038 75.164);
+    --color-orange-200: oklch(0.913 0.077 55.934);
+    --color-orange-300: oklch(0.856 0.147 55.09);
+    --color-orange-400: oklch(0.784 0.183 54.768);
+    --color-orange-500: oklch(.705 .213 47.604);
+    --color-orange-600: oklch(.646 .222 41.116);
+    --color-orange-700: oklch(.553 .195 38.402);
+    --color-orange-800: oklch(0.463 0.156 37.304);
+    --color-orange-900: oklch(0.382 0.123 38.172);
+    
+    /* Complete Yellow Scale - Added missing 50, 200, 300, 400, 500, 600, 800, 900 */
+    --color-yellow-50: oklch(0.987 0.026 102.212);
+    --color-yellow-100: oklch(.973 .071 103.193);
+    --color-yellow-200: oklch(0.945 0.129 101.54);
+    --color-yellow-300: oklch(0.905 0.182 98.111);
+    --color-yellow-400: oklch(0.852 0.199 91.936);
+    --color-yellow-500: oklch(0.769 0.188 70.08);
+    --color-yellow-600: oklch(0.687 0.179 66.558);
+    --color-yellow-700: oklch(.554 .135 66.442);
+    --color-yellow-800: oklch(0.464 0.105 61.907);
+    --color-yellow-900: oklch(0.387 0.078 57.708);
+    
+    /* Complete Purple Scale - Added missing 200, 300, 400, 500, 600, 800, 900 */
+    --color-purple-50: oklch(.977 .014 308.299);
+    --color-purple-100: oklch(.946 .033 307.174);
+    --color-purple-200: oklch(0.902 0.063 306.703);
+    --color-purple-300: oklch(0.827 0.119 306.383);
+    --color-purple-400: oklch(0.738 0.183 305.504);
+    --color-purple-500: oklch(0.627 0.265 303.9);
+    --color-purple-600: oklch(0.558 0.288 302.321);
+    --color-purple-700: oklch(.496 .265 301.924);
+    --color-purple-800: oklch(0.438 0.218 304.987);
+    --color-purple-900: oklch(0.381 0.176 304.987);
+    
     --color-black: #000;
     --color-white: #fff;
     --spacing: .25rem;
@@ -425,6 +495,107 @@
 }
 
 @layer utilities {
+
+
+
+  .bg-green-600 {
+    background-color: var(--color-green-600);
+  }
+  
+  .bg-red-600 {
+    background-color: var(--color-red-600);
+  }
+  
+  .text-red-800 {
+    color: var(--color-red-800);
+  }
+  
+  .bg-blue-600\/15 {
+    background-color: color-mix(in oklab, var(--color-blue-600) 15%, transparent);
+  }
+  
+  .bg-green-600\/15 {
+    background-color: color-mix(in oklab, var(--color-green-600) 15%, transparent);
+  }
+  
+  /* Missing gradient utilities */
+  .from-green-500 {
+    --tw-gradient-from: var(--color-green-500);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  
+  .to-emerald-500 {
+    --tw-gradient-to: var(--color-emerald-500);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  
+  .from-gray-500 {
+    --tw-gradient-from: var(--color-gray-500);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  
+  .to-gray-600 {
+    --tw-gradient-to: var(--color-gray-600);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  
+  /* Hover states used in your component */
+  @media (hover: hover) {
+    .hover\:bg-green-700:hover {
+      background-color: var(--color-green-700);
+    }
+    
+    .hover\:bg-red-700:hover {
+      background-color: var(--color-red-700);
+    }
+    
+    .hover\:bg-blue-700:hover {
+      background-color: var(--color-blue-700);
+    }
+  }
+  
+  /* Border colors */
+  .border-green-300 {
+    border-color: var(--color-green-300);
+  }
+  
+  .border-yellow-200 {
+    border-color: var(--color-yellow-200);
+  }
+   /* Add gradient utility classes */
+  .from-green-500 {
+    --tw-gradient-from: var(--color-green-500);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  
+  .to-emerald-500 {
+    --tw-gradient-to: var(--color-emerald-500);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  
+  .from-gray-500 {
+    --tw-gradient-from: var(--color-gray-500);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  
+  .to-gray-600 {
+    --tw-gradient-to: var(--color-gray-600);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  
+  /* Yellow border */
+  .border-yellow-200 {
+    border-color: var(--color-yellow-200);
+  }
+  .text-red-300 {
+    color: var(--color-red-300);
+  }
+  .text-green-400 {
+    color: var(--color-green-400);
+  }
+  .bg-blue-300 {
+    background-color: var(--color-blue-300);
+  }
   .absolute {
     position: absolute;
   }
@@ -922,6 +1093,16 @@
 
   .bg-red-500 {
     background-color: var(--color-red-500);
+  }.bg-red-400 {
+    background-color: var(--color-red-400);
+  }.bg-red-300 {
+    background-color: var(--color-red-300);
+  }.bg-red-200 {
+    background-color: var(--color-red-200);
+  }.bg-red-600 {
+    background-color: var(--color-red-600);
+  }.bg-red-700 {
+    background-color: var(--color-red-700);
   }
 
   .bg-white {

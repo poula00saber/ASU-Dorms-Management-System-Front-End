@@ -8,12 +8,14 @@ import {
 import Login from "./components/Login";
 import Layout from "./components/Layout";
 import Dashboard from "./components/Dashboard";
+import RestaurantDashboard from "./components/RestaurantDashboard"; // ADD THIS IMPORT
 import StudentsList from "./components/StudentsList";
 import StudentForm from "./components/StudentForm";
 import StudentDetails from "./components/StudentDetails";
 import HolidayManager from "./components/HolidayManagerFinal";
 import Reports from "./components/Reports";
 import MealScanner from "./components/MealScanner";
+import AllLocationsMealSettings from "./components/AllLocationsMealSettings";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PaymentManagerArabic from "./components/Payment Manager";
 import { Toaster } from "sonner";
@@ -46,6 +48,20 @@ function App() {
     setUserRole(null);
   };
 
+  // Function to get default route based on role
+  const getDefaultRoute = (role: UserRole) => {
+    switch (role) {
+      case "registration":
+        return "/";
+      case "restaurant":
+        return "/restaurant-dashboard";
+      case "user":
+        return "/holidays";
+      default:
+        return "/login";
+    }
+  };
+
   return (
     <Router>
       {!isAuthenticated ? (
@@ -59,19 +75,23 @@ function App() {
         <>
           <Layout userRole={userRole} onLogout={handleLogout}>
             <Routes>
-              {/* Root route - redirect based on role */}
+              {/* Registration Dashboard */}
               <Route
                 path="/"
                 element={
-                  userRole === "user" ? (
-                    <Navigate to="/holidays" replace />
-                  ) : userRole === "restaurant" ? (
-                    <Navigate to="/scanner/breakfast-dinner" replace />
-                  ) : (
-                    <ProtectedRoute allowedRoles={["registration"]}>
-                      <Dashboard userRole={userRole} />
-                    </ProtectedRoute>
-                  )
+                  <ProtectedRoute allowedRoles={["registration"]}>
+                    <Dashboard userRole="registration" />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Restaurant Dashboard - Use the separate RestaurantDashboard component */}
+              <Route
+                path="/restaurant-dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={["restaurant"]}>
+                    <RestaurantDashboard />
+                  </ProtectedRoute>
                 }
               />
 
@@ -123,7 +143,9 @@ function App() {
               <Route
                 path="/payments"
                 element={
-                  <ProtectedRoute allowedRoles={["registration"]}>
+                  <ProtectedRoute allowedRoles={["registration", "user"]}>
+                    {" "}
+                    {/* Added "user" here */}
                     <PaymentManagerArabic />
                   </ProtectedRoute>
                 }
@@ -139,7 +161,17 @@ function App() {
                 }
               />
 
-              {/* Restaurant Routes */}
+              {/* Meal Settings - Registration only */}
+              <Route
+                path="/meal-settings"
+                element={
+                  <ProtectedRoute allowedRoles={["registration"]}>
+                    <AllLocationsMealSettings />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Restaurant Scanner Routes */}
               <Route
                 path="/scanner/breakfast-dinner"
                 element={
@@ -156,19 +188,25 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/scanner/combined"
+                element={
+                  <ProtectedRoute allowedRoles={["restaurant"]}>
+                    <MealScanner mealType="combined" />
+                  </ProtectedRoute>
+                }
+              />
 
-              {/* Catch all - redirect to appropriate home */}
+              {/* Root redirect - goes to appropriate dashboard */}
+              <Route
+                path="/"
+                element={<Navigate to={getDefaultRoute(userRole)} replace />}
+              />
+
+              {/* Catch all - redirect to appropriate dashboard */}
               <Route
                 path="*"
-                element={
-                  userRole === "user" ? (
-                    <Navigate to="/holidays" replace />
-                  ) : userRole === "restaurant" ? (
-                    <Navigate to="/scanner/breakfast-dinner" replace />
-                  ) : (
-                    <Navigate to="/" replace />
-                  )
-                }
+                element={<Navigate to={getDefaultRoute(userRole)} replace />}
               />
             </Routes>
           </Layout>
