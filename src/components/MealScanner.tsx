@@ -132,8 +132,8 @@ export default function MealScanner({ mealType }: MealScannerProps) {
        active: false,
      };
    } else if (mealType === "breakfast-dinner") {
-     if (hour >= 18 && hour < 21) {
-       return { name: "إفطار / عشاء", time: "6:00 PM - 9:00 PM", active: true };
+     if (hour >= 17 && hour < 21) {
+       return { name: "إفطار / عشاء", time: "5:00 PM - 9:00 PM", active: true };
      }
      return {
        name: "إفطار / عشاء",
