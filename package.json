@@ -1,7 +1,7 @@
 {
   "name": "ASU Dorms Management System UI",
   "version": "0.1.0",
-    "type": "module", 
+  "type": "module",
   "private": true,
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.3",
@@ -36,6 +36,7 @@
     "cmdk": "^1.1.1",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
+    "jsbarcode": "^3.12.1",
     "jspdf": "^3.0.4",
     "lucide-react": "^0.487.0",
     "next-themes": "^0.4.6",
@@ -53,6 +54,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
+    "@types/jsbarcode": "^3.11.4",
     "@types/node": "^20.19.25",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",

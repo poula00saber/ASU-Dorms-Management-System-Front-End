@@ -64,6 +64,7 @@ export default function Layout({ children, userRole, onLogout }: LayoutProps) {
     { icon: Calendar, label: "الإجازات", path: "/holidays" },
     { icon: FileText, label: "التقارير", path: "/reports" },
     { icon: Utensils, label: "إعدادات الوجبات", path: "/meal-settings" },
+    { icon: Utensils, label: "طباعة الكارنيهات", path: "/print-ids" },
   ];
 
   // Dynamic restaurant menu based on settings

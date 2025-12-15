@@ -18,6 +18,8 @@ import MealScanner from "./components/MealScanner";
 import AllLocationsMealSettings from "./components/AllLocationsMealSettings";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PaymentManagerArabic from "./components/Payment Manager";
+import StudentIdPrinter from "./components/StudentIdPrinter";
+
 import { Toaster } from "sonner";
 
 export type UserRole = "registration" | "restaurant" | "user" | null;
@@ -125,6 +127,16 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={["registration"]}>
                     <StudentDetails />
+                  </ProtectedRoute>
+                }
+              />
+
+{/* Print ids - accessible by  Registration */}
+              <Route
+                path="/print-ids"
+                element={
+                  <ProtectedRoute allowedRoles={["registration"]}>
+                    <StudentIdPrinter />
                   </ProtectedRoute>
                 }
               />
