@@ -202,235 +202,352 @@ export default function StudentIdPrinter() {
     setSelectedStudents([]);
     setSelectedAll(false);
   };
+const generatePrintContent = (studentsToPrint: Student[]) => {
+  // Group students into pages of 10
+  const pages: Student[][] = [];
+  for (let i = 0; i < studentsToPrint.length; i += 10) {
+    pages.push(studentsToPrint.slice(i, i + 10));
+  }
 
-  // Generate HTML for printing
-  const generatePrintContent = (studentsToPrint: Student[]) => {
-    // Group students into pages of 10
-    const pages: Student[][] = [];
-    for (let i = 0; i < studentsToPrint.length; i += 10) {
-      pages.push(studentsToPrint.slice(i, i + 10));
-    }
+  const currentYear = "2025-2026";
 
-    const currentYear = "2025-2026";
-
-    return `
-      <!DOCTYPE html>
-      <html dir="rtl" lang="ar">
-      <head>
-        <meta charset="UTF-8">
-        <title>طباعة البطاقات الجامعية - ${
-          studentsToPrint.length
-        } طالب - ${currentDormLocation}</title>
-        <style>
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          
-          @page {
-            size: A4;
-            margin: 10mm;
-          }
-          
+  return `
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+      <meta charset="UTF-8">
+      <title>طباعة البطاقات الجامعية - ${
+        studentsToPrint.length
+      } طالب - ${currentDormLocation}</title>
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        
+        @page {
+          size: A4;
+          margin: 5mm;
+        }
+        
+        body {
+          font-family: 'Arial', 'Helvetica', sans-serif;
+          direction: rtl;
+          background: white;
+          width: 210mm;
+          margin: 0 auto;
+          padding: 0;
+        }
+        
+        .page {
+          width: 100%;
+          min-height: 287mm;
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 2mm 6mm;
+          align-content: start;
+          padding: 0;
+        }
+        
+        .page:last-child {
+          page-break-after: auto;
+        }
+        
+        .id-card {
+          width: 95mm;
+          height: 54mm;
+          border: 1.8px solid #000;
+          border-radius: 4px;
+          overflow: hidden;
+          background: white;
+          position: relative;
+          font-family: Arial, sans-serif;
+          page-break-inside: avoid;
+        }
+        
+        /* ===== HEADER ===== */
+        .card-header {
+          height: 8mm;
+          background: #c62828;
+          color: white;
+          font-size: 8.5pt;
+          font-weight: bold;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 3mm;
+          position: relative;
+          z-index: 10;
+        }
+        
+        .header-year {
+          font-size: 8pt;
+        }
+        
+        .header-dorm {
+          font-size: 8.5pt;
+          text-align: center;
+          flex: 1;
+          margin: 0 2mm;
+        }
+        
+        /* ===== BODY ===== */
+        .card-body {
+          display: flex;
+          height: calc(100% - 8mm);
+        }
+        
+        /* ===== UNIVERSITY LOGO ===== */
+        .university-logo {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 40mm;
+          height: auto;
+          opacity: 0.4; /* Reduced opacity */
+          pointer-events: none;
+          z-index: 1;
+        }
+        
+        /* ===== PHOTO ===== */
+        .photo-section {
+          width: 30mm;
+          padding: 1mm;
+          display: flex;
+          align-items: flex-start;
+          justify-content: center;
+          border-left: 1px solid #eee;
+          position: relative;
+          z-index: 5;
+        }
+        
+        .photo {
+          width: 25mm;
+          height: 30mm;
+          object-fit: cover;
+          border: 1px solid #000;
+          margin-top: 1mm;
+          background-color: white; /* Ensure photo has background */
+          position: relative;
+          z-index: 6;
+        }
+        
+        /* ===== INFO SECTION ===== */
+        .info-section {
+          flex: 1;
+          padding: 1mm 2mm;
+          display: flex;
+          flex-direction: column;
+          direction: rtl;
+          position: relative;
+          z-index: 5;
+        }
+        
+        /* Student Name - Centered and Larger */
+        .student-name {
+          font-weight: bold;
+          font-size: 11pt;
+          text-align: center;
+          color: #c62828;
+          margin: 0.5mm 0 2mm 0;
+          padding: 0.5mm;
+          border-bottom: 1px solid #eee;
+          width: 100%;
+          position: relative;
+          z-index: 5;
+          /* REMOVED background-color to allow logo to show through */
+        }
+        
+        /* Info container for all details */
+        .info-container {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 1.2mm;
+          padding: 0 1mm;
+          position: relative;
+          z-index: 5;
+        }
+        
+        /* Inline label-value pairs */
+        .info-row {
+          display: flex;
+          align-items: center;
+          font-size: 9pt;
+          position: relative;
+          z-index: 5;
+          /* REMOVED background-color to allow logo to show through */
+        }
+        
+        .info-label {
+          font-weight: bold;
+          min-width: 18mm;
+          text-align: left;
+        }
+        
+        .info-value {
+          text-align: right;
+          flex: 1;
+          padding-right: 2mm;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        
+        /* Special styling for student ID */
+        .student-id-value {
+          font-family: monospace;
+          font-weight: bold;
+          font-size: 9.5pt;
+        }
+        
+        /* ===== BARCODE ===== */
+        .barcode-section {
+          text-align: center;
+          margin-top: auto;
+          padding-top: 1mm;
+          border-top: 1px solid #eee;
+          position: relative;
+          z-index: 5;
+          /* REMOVED background-color to allow logo to show through */
+        }
+        
+        .barcode-section img {
+          width: 45mm;
+          height: 9mm;
+        }
+        
+        @media print {
           body {
-            font-family: 'Arial', 'Helvetica', sans-serif;
-            direction: rtl;
-            background: white;
-            width: 210mm;
-            margin: 0 auto;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            width: 100%;
           }
           
           .page {
-            width: 210mm;
-            min-height: 297mm;
-            padding: 10mm;
-            page-break-after: always;
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8mm 12mm;
-            align-content: start;
+            padding: 0;
+            margin: 0;
+            width: 100%;
+            height: 100%;
           }
           
-          .page:last-child {
-            page-break-after: auto;
+          .id-card {
+            box-shadow: none;
+            border: 1.5px solid #000;
           }
           
-        .id-card {
-  width: 85mm;
-  height: 54mm;
-  border: 1.8px solid #000;
-  border-radius: 4px;
-  overflow: hidden;
-  background: white;
-  position: relative;
-  font-family: Arial, sans-serif;
-}
-
-/* ===== HEADER ===== */
-.card-header {
-  height: 9mm;
-  background: #c62828;
-  color: white;
-  font-size: 9pt;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 4mm;
-}
-
-/* ===== BODY ===== */
-.card-body {
-  display: flex;
-  height: calc(100% - 9mm);
-}
-
-/* ===== PHOTO ===== */
-.photo-section {
-  width: 26mm;
-  padding: 2mm;
-  border-right: 1px solid #000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.photo {
-  width: 22mm;
-  height: 26mm;
-  object-fit: cover;
-  border: 1px solid #000;
-}
-
-/* ===== INFO ===== */
-.info-section {
-  flex: 1;
-  padding: 2mm 3mm;
-  font-size: 8.5pt;
-  display: flex;
-  flex-direction: column;
-}
-
-.dorm-name {
-  font-weight: bold;
-  text-align: center;
-  font-size: 9pt;
-  margin-bottom: 1mm;
-}
-
-.student-name {
-  font-weight: bold;
-  font-size: 9.5pt;
-  margin-bottom: 1mm;
-  text-align: center;
-}
-
-.info-row {
-  margin-bottom: 0.6mm;
-}
-
-/* ===== BARCODE ===== */
-.barcode-section {
-  margin-top: auto;
-  text-align: center;
-}
-
-.barcode-section img {
-  width: 50mm;
-  height: 11mm;
-}
-
-          .student-id {
-            font-family: monospace;
-            font-weight: bold;
-            color: #2c3e50;
-            font-size: 9pt;
+          .card-header {
+            -webkit-print-color-adjust: exact;
+            color-adjust: exact;
           }
           
-          .header-year {
-            font-size: 8pt;
+          .university-logo {
+            opacity: 0.15; /* Slightly more visible for print */
           }
-          
-          @media print {
-            body {
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-              width: 100%;
-            }
-            
-            .page {
-              padding: 0;
-              margin: 0;
-              width: 100%;
-              height: 100%;
-            }
-            
-            .id-card {
-              box-shadow: none;
-              border: 1.5px solid #000;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        ${pages
-          .map(
-            (pageStudents) => `
-          <div class="page">
-            ${pageStudents
-              .map((student) => {
-                const studentName =
-                  student.fullName ||
-                  `${student.firstName} ${student.lastName}`;
-                const dormName =
-                  student.dormLocationName ||
-                  dormLocationMap[student.dormLocationId] ||
-                  currentDormLocation;
-                const barcodeData =
-                  student.nationalId ||
-                  student.studentId ||
-                  student.id.toString();
+        }
+      </style>
+    </head>
+    <body>
+      ${pages
+        .map(
+          (pageStudents) => `
+        <div class="page">
+          ${pageStudents
+            .map((student) => {
+              const studentName =
+                student.fullName || `${student.firstName} ${student.lastName}`;
+              const dormName =
+                student.dormLocationName ||
+                dormLocationMap[student.dormLocationId] ||
+                currentDormLocation;
+              const barcodeData =
+                student.nationalId ||
+                student.studentId ||
+                student.id.toString();
 
-                return `
-                  <div class="id-card">
-  <div class="card-header">
-    <span>2025 - 2026</span>
-    <span>المدينة الجامعية</span>
-  </div>
+              // Remove "كلية" from faculty name
+              const facultyName = student.faculty
+                ? student.faculty.replace(/^كلية\s*/i, "").trim()
+                : "-";
 
-  <div class="card-body">
-    <div class="photo-section">
-      <img src="${student.photoUrl}" class="photo" />
-    </div>
+              // Remove "المبنى" from building name
+              const buildingName =
+                student.building || student.buildingNumber || "-";
+              const cleanBuildingName = buildingName
+                ? buildingName.replace(/^المبنى\s*/i, "").trim()
+                : "-";
 
-    <div class="info-section">
-      <div class="dorm-name">${dormName}</div>
-      <div class="student-name">${studentName}</div>
+              return `
+                <div class="id-card">
+                  <!-- Transparent University Logo -->
+                  <img src="src/Ain Shams University.png" class="university-logo" alt="Logo" />
+                  
+                  <div class="card-header">
+                    <span class="header-year">2025 - 2026</span>
+                    <span class="header-dorm">${dormName}</span>
+                    <span>المدينة الجامعية</span>
+                  </div>
 
-      <div class="info-row">الكلية: ${student.faculty}</div>
-      <div class="info-row">الفرقة: ${student.level}</div>
-      <div class="info-row">رقم الطالب: ${student.studentId}</div>
-      <div class="info-row">المبنى: ${student.building || "-"}</div>
-
-      <div class="barcode-section">
-        <img src="${generateBarcode(barcodeData)}" />
-      </div>
-    </div>
-  </div>
-</div>
-
-                `;
-              })
-              .join("")}
-          </div>
-        `
-          )
-          .join("")}
-      </body>
-      </html>
-    `;
-  };
+                  <div class="card-body">
+                    <!-- Right side: All student info -->
+                    <div class="info-section">
+                      <!-- Centered Student Name -->
+                      <div class="student-name">${studentName}</div>
+                      
+                      <div class="info-container">
+                        <!-- Only essential info with cleaned text -->
+                        <div class="info-row">
+                          <span class="info-label">الكلية:</span>
+                          <span class="info-value">${facultyName}</span>
+                        </div>
+                        
+                        <div class="info-row">
+                          <span class="info-label">الفرقة:</span>
+                          <span class="info-value">${
+                            student.level || "-"
+                          }</span>
+                        </div>
+                        
+                        <div class="info-row">
+                          <span class="info-label">رقم الملف:</span>
+                          <span class="info-value student-id-value">${
+                            student.studentId || "-"
+                          }</span>
+                        </div>
+                        
+                        <div class="info-row">
+                          <span class="info-label">المبنى:</span>
+                          <span class="info-value">${cleanBuildingName}</span>
+                        </div>
+                      </div>
+                      
+                      <!-- Barcode at bottom -->
+                      <div class="barcode-section">
+                        <img src="${generateBarcode(barcodeData)}" />
+                      </div>
+                    </div>
+                    
+                    <!-- Left side: Photo -->
+                    <div class="photo-section">
+                      <img src="${
+                        student.photoUrl || generateDefaultAvatar(student.id)
+                      }" class="photo" />
+                    </div>
+                  </div>
+                </div>
+              `;
+            })
+            .join("")}
+        </div>
+      `
+        )
+        .join("")}
+    </body>
+    </html>
+  `;
+};
 
   // Handle print all
   const handlePrintAll = () => {

@@ -11,10 +11,8 @@ import {
 import { toast } from "sonner";
 
 interface MealScannerProps {
-  mealType: "breakfast-dinner" | "lunch" | "combined";
+  mealType: "breakfast-dinner" | "lunch";
 }
-
-
 
 interface ScanRecord {
   id: number;
@@ -54,11 +52,6 @@ export default function MealScanner({ mealType }: MealScannerProps) {
   const lastScanTimeRef = useRef<number>(0);
   const SCAN_COOLDOWN_MS = 1000; // 1 second cooldown between scans
 
-  // Track last input time to detect scanner vs manual input
-  const lastInputTimeRef = useRef<number>(0);
-  const MIN_SCANNER_SPEED_MS = 50; // Scanner inputs are very fast (< 50ms between chars)
-  const MAX_MANUAL_CHARS = 4; // Maximum allowed manual characters
-
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -82,17 +75,12 @@ export default function MealScanner({ mealType }: MealScannerProps) {
       const now = Date.now();
       if (now - lastScanTimeRef.current < SCAN_COOLDOWN_MS) return;
 
-      // Check if this looks like scanner input (fast and long enough)
-      const inputLength = barcodeInput.length;
-      const isLikelyScanner = inputLength >= 5;
-
-      if (isLikelyScanner) {
+      // Check if input looks like a barcode (usually ends with Enter or Tab)
+      // For barcode scanners, they often append special characters
+      // Let's check for minimum length (e.g., at least 5 characters)
+      if (barcodeInput.length >= 5) {
         await performScan(barcodeInput.trim());
         setBarcodeInput(""); // Clear input after scanning
-      } else {
-        // If it's short input (manual typing), clear it
-        toast.error("الرجاء استخدام الماسح الضوئي فقط");
-        setBarcodeInput("");
       }
     };
 
@@ -115,38 +103,25 @@ export default function MealScanner({ mealType }: MealScannerProps) {
     }
   }, [isScanning, scanResult]);
 
- const getMealInfo = () => {
-   const hour = currentTime.getHours();
+  const getMealInfo = () => {
+    const hour = currentTime.getHours();
 
-   if (mealType === "combined") {
-     if (hour >= 13 && hour < 21) {
-       return {
-         name: "مسح الوجبة (جميع الوجبات)",
-         time: "1:00 PM - 9:00 PM",
-         active: true,
-       };
-     }
-     return {
-       name: "مسح الوجبة (جميع الوجبات)",
-       time: "خارج ساعات الوجبات",
-       active: false,
-     };
-   } else if (mealType === "breakfast-dinner") {
-     if (hour >= 17 && hour < 21) {
-       return { name: "إفطار / عشاء", time: "5:00 PM - 9:00 PM", active: true };
-     }
-     return {
-       name: "إفطار / عشاء",
-       time: "خارج ساعات الوجبات",
-       active: false,
-     };
-   } else {
-     if (hour >= 13 && hour < 21) {
-       return { name: "غداء", time: "1:00 PM - 9:00 PM", active: true };
-     }
-     return { name: "غداء", time: "خارج ساعات الوجبات", active: false };
-   }
- };
+    if (mealType === "breakfast-dinner") {
+      if (hour >= 0 && hour < 2) {
+        return { name: "عشاء", time: "6:00 PM - 9:00 PM", active: true };
+      }
+      return {
+        name: "إفطار / عشاء",
+        time: "خارج ساعات الوجبات",
+        active: false,
+      };
+    } else {
+      if (hour >= 13 && hour < 24) {
+        return { name: "غداء", time: "1:00 PM - 9:00 PM", active: true };
+      }
+      return { name: "غداء", time: "خارج ساعات الوجبات", active: false };
+    }
+  };
 
   const getFullPhotoUrl = (relativePath?: string) => {
     if (!relativePath) return undefined;
@@ -175,36 +150,26 @@ export default function MealScanner({ mealType }: MealScannerProps) {
   const performScan = async (nationalId: string) => {
     if (!nationalId.trim()) return;
 
+    // Update last scan time
     lastScanTimeRef.current = Date.now();
+
     setIsScanning(true);
 
     try {
       const token =
         localStorage.getItem("authToken") || localStorage.getItem("token");
+      const mealTypeId = mealType === "breakfast-dinner" ? 1 : 2;
 
-      // Determine endpoint based on mealType
-      let endpoint: string;
-      let requestBody: any;
-
-      if (mealType === "combined") {
-        endpoint = `${API_BASE}/api/Meals/scan-combined`;
-        requestBody = { nationalId: nationalId.trim() };
-      } else {
-        endpoint = `${API_BASE}/api/Meals/scan`;
-        const mealTypeId = mealType === "breakfast-dinner" ? 1 : 2;
-        requestBody = {
-          nationalId: nationalId.trim(),
-          mealTypeId: mealTypeId,
-        };
-      }
-
-      const res = await fetch(endpoint, {
+      const res = await fetch(`${API_BASE}/api/Meals/scan`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          nationalId: nationalId.trim(),
+          mealTypeId: mealTypeId,
+        }),
       });
 
       const data: ScanResult = await res.json();
@@ -233,6 +198,7 @@ export default function MealScanner({ mealType }: MealScannerProps) {
           message: data.message,
           photoUrl: data.student.photoUrl,
         };
+        // CHANGED: Keep only last 10 records
         setScanHistory([newRecord, ...scanHistory.slice(0, 9)]);
       }
 
@@ -263,22 +229,7 @@ export default function MealScanner({ mealType }: MealScannerProps) {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    const now = Date.now();
-    const timeSinceLastInput = now - lastInputTimeRef.current;
-
-    // Detect if this is likely manual typing (slow) vs scanner (fast)
-    // Scanners input very quickly (< 50ms between characters)
-    const isLikelyManual = timeSinceLastInput > MIN_SCANNER_SPEED_MS;
-
-    if (isLikelyManual && value.length > MAX_MANUAL_CHARS) {
-      // This is likely manual typing or copy-paste of full national ID
-      toast.error("الرجاء استخدام الماسح الضوئي فقط - لا يسمح بالإدخال اليدوي");
-      setBarcodeInput("");
-      return;
-    }
-
     setBarcodeInput(value);
-    lastInputTimeRef.current = now;
 
     // If input is cleared, reset scan result background after a delay
     if (!value.trim()) {
@@ -301,55 +252,34 @@ export default function MealScanner({ mealType }: MealScannerProps) {
     }
   };
 
-  // Completely prevent paste
-  const handleInputPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+  // ADDED: Handle paste to prevent it
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    toast.error("لا يسمح بلصق البيانات. يرجى استخدام الماسح الضوئي فقط.");
+    toast.error("النسخ واللصق غير مسموح. يرجى استخدام الماسح الضوئي فقط.");
   };
 
-  // Prevent copy as well
-  const handleInputCopy = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-  };
-
-  // Prevent cut
-  const handleInputCut = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-  };
-
-  // Handle keyboard input to detect manual typing
-  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Allow only digits for scanner input
-    const isDigit = /^\d$/.test(e.key);
-    const isControlKey = [
-      "Backspace",
-      "Delete",
-      "Tab",
-      "Escape",
-      "Enter",
-      "ArrowLeft",
-      "ArrowRight",
-      "ArrowUp",
-      "ArrowDown",
-      "Home",
-      "End",
-    ].includes(e.key);
-
-    if (!isDigit && !isControlKey && e.key.length === 1) {
+  // ADDED: Handle keyboard shortcuts for paste
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Prevent Ctrl+V, Cmd+V, and Shift+Insert (common paste shortcuts)
+    if (
+      ((e.ctrlKey || e.metaKey) && e.key === "v") ||
+      (e.shiftKey && e.key === "Insert")
+    ) {
       e.preventDefault();
-      toast.error("يسمح بإدخال الأرقام فقط للماسح الضوئي");
+      toast.error("النسخ واللصق غير مسموح. يرجى استخدام الماسح الضوئي فقط.");
       return;
     }
 
-    // If Enter is pressed and input is less than 5 chars, prevent scan
-    if (e.key === "Enter" && barcodeInput.length < 5) {
+    // Handle Enter key for manual submission
+    if (e.key === "Enter") {
       e.preventDefault();
-      toast.error(
-        "الرجاء استخدام الماسح الضوئي - يجب أن يكون الباركود 5 أرقام على الأقل"
-      );
-      setBarcodeInput("");
-      return;
+      handleBarcodeSubmit(e as any);
     }
+  };
+
+  // ADDED: Prevent right-click context menu
+  const handleContextMenu = (e: React.MouseEvent<HTMLInputElement>) => {
+    e.preventDefault();
   };
 
   const mealInfo = getMealInfo();
@@ -357,12 +287,12 @@ export default function MealScanner({ mealType }: MealScannerProps) {
   const pageBgClass = scanResult
     ? scanResult.success
       ? "bg-green-100"
-      : "bg-red-200"
+      : "bg-red-100"
     : "bg-white";
 
   return (
     <div
-      className={`space-y-6 min-h-screen transition-colors duration-300 ${pageBgClass}`}// back ground col-form-label
+      className={`space-y-6 min-h-screen transition-colors duration-300 ${pageBgClass}`}
     >
       {/* Header with Clock */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow-lg p-8 text-white">
@@ -529,6 +459,9 @@ export default function MealScanner({ mealType }: MealScannerProps) {
           <div className="bg-white rounded-lg shadow-lg">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-gray-900">السجلات الأخيرة</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                عرض آخر 10 عمليات مسح فقط
+              </p>
             </div>
             <div className="p-4 max-h-[400px] overflow-y-auto">
               {scanHistory.length === 0 ? (
@@ -605,7 +538,9 @@ export default function MealScanner({ mealType }: MealScannerProps) {
               <h2 className="text-gray-900 mb-2 text-xl font-bold">
                 مسح باركود الطالب
               </h2>
-              <p className="text-gray-600">استخدم الماسح الضوئي فقط</p>
+              <p className="text-gray-600">
+                استخدم الماسح الضوئي فقط - النسخ غير مسموح
+              </p>
               <div className="mt-2 text-sm text-gray-500">
                 {isScanning ? (
                   <span className="text-blue-600">جاري المسح...</span>
@@ -614,9 +549,6 @@ export default function MealScanner({ mealType }: MealScannerProps) {
                     جاهز للمسح
                   </span>
                 )}
-              </div>
-              <div className="mt-1 text-xs text-red-600 font-semibold">
-                لا يسمح بالإدخال اليدوي أو النسخ
               </div>
             </div>
 
@@ -628,18 +560,16 @@ export default function MealScanner({ mealType }: MealScannerProps) {
                   value={barcodeInput}
                   onChange={handleInputChange}
                   onFocus={handleInputFocus}
-                  onKeyDown={handleInputKeyDown}
-                  onPaste={handleInputPaste}
-                  onCopy={handleInputCopy}
-                  onCut={handleInputCut}
-                  placeholder="مرر الباركود هنا (الماسح فقط)"
+                  // ADDED: Paste prevention handlers
+                  onPaste={handlePaste}
+                  onKeyDown={handleKeyDown}
+                  onContextMenu={handleContextMenu}
+                  placeholder="وجّه الماسح الضوئي هنا"
                   className="w-full px-6 py-4 text-center text-lg border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-blue-50"
                   autoFocus
                   disabled={isScanning}
                   autoComplete="off"
                   spellCheck="false"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
                 />
                 <div className="absolute top-1/2 right-3 transform -translate-y-1/2">
                   {isScanning ? (
@@ -651,9 +581,7 @@ export default function MealScanner({ mealType }: MealScannerProps) {
               </div>
               <button
                 onClick={handleBarcodeSubmit as any}
-                disabled={
-                  isScanning || !barcodeInput.trim() || barcodeInput.length < 5
-                }
+                disabled={isScanning || !barcodeInput.trim()}
                 className="w-full bg-blue-600 text-white py-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold text-lg"
               >
                 {isScanning ? "جاري المسح..." : "معالجة المسح (Enter)"}
@@ -665,30 +593,23 @@ export default function MealScanner({ mealType }: MealScannerProps) {
                 تعليمات المسح:
               </p>
               <ul className="text-xs text-blue-800 space-y-1">
-                <li>• استخدم الماسح الضوئي فقط</li>
-                <li>• لا يسمح بالإدخال اليدوي</li>
-                <li>• لا يسمح بنسخ ولصق البيانات</li>
+                <li>• الحقل جاهز للمسح تلقائياً عند فتح الصفحة</li>
+                <li>• استخدم الماسح الضوئي فقط - النسخ واللصق غير مسموح</li>
                 <li>• مرر الباركود وسيتم المسح تلقائياً</li>
+                <li>• الحقل سيتم تفريغه تلقائياً بعد كل مسح</li>
                 <li>• جاهز للمسح التالي فوراً</li>
               </ul>
             </div>
 
-            {/* Input status display */}
-            {barcodeInput && (
-              <div className="mt-4 p-3 bg-gray-100 rounded-lg text-center">
-                <p className="text-xs text-gray-600 mb-1">
-                  {barcodeInput.length < 5
-                    ? "مدخلات غير كافية - استخدم الماسح الضوئي"
-                    : "باركود جاهز للمسح"}
-                </p>
-                <p className="text-sm font-mono bg-white p-2 rounded border">
-                  {barcodeInput}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  الطول: {barcodeInput.length} رقم
-                </p>
-              </div>
-            )}
+            {/* ADDED: Warning about paste being disabled */}
+            <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800 font-semibold">
+                ملاحظة: تم تعطيل النسخ واللصق في هذا النظام لأسباب أمنية.
+              </p>
+              <p className="text-xs text-yellow-600 mt-1">
+                يجب استخدام الماسح الضوئي فقط لإدخال الأرقام القومية.
+              </p>
+            </div>
           </div>
         </div>
       </div>
