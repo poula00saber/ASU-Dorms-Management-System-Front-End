@@ -807,210 +807,210 @@ export default function PaymentManagerArabic() {
 
       {/* Add Payment Modal - Updated with scrollable form */}
       {showPaymentModal && selectedStudent && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div
-            className="bg-white rounded-lg max-w-md w-full max-h-[90vh] flex flex-col"
-            dir="rtl"
-          >
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 shrink-0">
-              <h2 className="text-xl font-bold text-gray-900">
-                إضافة دفعة جديدة
-              </h2>
-              <button
-                onClick={() => setShowPaymentModal(false)}
-                className="p-1 hover:bg-gray-100 rounded transition-colors"
-              >
-                <X className="w-6 h-6 text-gray-600" />
-              </button>
-            </div>
-
-            <form
-              onSubmit={handlePaymentSubmit}
-              className="flex-1 overflow-y-auto p-6 space-y-6"
-            >
-              <div className="bg-blue-50 p-4 rounded-lg mb-4">
-                <p className="text-gray-700">
-                  <span className="font-semibold">الطالب:</span>{" "}
-                  {selectedStudent.firstName} {selectedStudent.lastName}
-                </p>
-                <p className="text-gray-700">
-                  <span className="font-semibold">الرقم الجامعي:</span>{" "}
-                  {selectedStudent.studentId}
-                </p>
-                {selectedStudent.hasOutstandingPayment && (
-                  <p className="text-red-700 font-semibold">
-                    المبلغ المتبقي:{" "}
-                    {formatCurrency(selectedStudent.outstandingAmount)}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-gray-700 font-semibold mb-2">
-                  نوع الدفع *
-                </label>
-                <select
-                  value={paymentFormData.paymentType}
-                  onChange={(e) =>
-                    setPaymentFormData({
-                      ...paymentFormData,
-                      paymentType: e.target.value as any,
-                    })
-                  }
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
+        <div className="fixed inset-0 bg-black/50 overflow-y-auto z-50">
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-md w-full" 
+            dir="rtl">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 shrink-0">
+                <h2 className="text-xl font-bold text-gray-900">
+                  إضافة دفعة جديدة
+                </h2>
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded transition-colors"
                 >
-                  <option value="MonthlyFee">الإيجار الشهري</option>
-                  <option value="MissedMealPenalty">
-                    غرامة الوجبات الفائتة
-                  </option>
-                  <option value="Other">دفعة أخرى</option>
-                </select>
+                  <X className="w-6 h-6 text-gray-600" />
+                </button>
               </div>
 
-              <div>
-                <label className="block text-gray-700 font-semibold mb-2">
-                  المبلغ *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={paymentFormData.amount}
-                  onChange={(e) =>
-                    setPaymentFormData({
-                      ...paymentFormData,
-                      amount: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                  placeholder="أدخل المبلغ"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-700 font-semibold mb-2">
-                  تاريخ الدفع *
-                </label>
-                <input
-                  type="date"
-                  value={paymentFormData.paymentDate}
-                  onChange={(e) =>
-                    setPaymentFormData({
-                      ...paymentFormData,
-                      paymentDate: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
-
-              {paymentFormData.paymentType === "MonthlyFee" && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-gray-700 font-semibold mb-2">
-                      الشهر
-                    </label>
-                    <select
-                      value={paymentFormData.month}
-                      onChange={(e) =>
-                        setPaymentFormData({
-                          ...paymentFormData,
-                          month: parseInt(e.target.value),
-                        })
-                      }
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg"
-                    >
-                      {Array.from({ length: 12 }, (_, i) => i + 1).map(
-                        (month) => (
-                          <option key={month} value={month}>
-                            {month}
-                          </option>
-                        )
-                      )}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-gray-700 font-semibold mb-2">
-                      السنة
-                    </label>
-                    <input
-                      type="number"
-                      value={paymentFormData.year}
-                      onChange={(e) =>
-                        setPaymentFormData({
-                          ...paymentFormData,
-                          year: parseInt(e.target.value),
-                        })
-                      }
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg"
-                      min="2020"
-                      max="2100"
-                    />
-                  </div>
+              <form
+                onSubmit={handlePaymentSubmit}
+                className="flex-1 overflow-y-auto p-6 space-y-6"
+              >
+                <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                  <p className="text-gray-700">
+                    <span className="font-semibold">الطالب:</span>{" "}
+                    {selectedStudent.firstName} {selectedStudent.lastName}
+                  </p>
+                  <p className="text-gray-700">
+                    <span className="font-semibold">الرقم الجامعي:</span>{" "}
+                    {selectedStudent.studentId}
+                  </p>
+                  {selectedStudent.hasOutstandingPayment && (
+                    <p className="text-red-700 font-semibold">
+                      المبلغ المتبقي:{" "}
+                      {formatCurrency(selectedStudent.outstandingAmount)}
+                    </p>
+                  )}
                 </div>
-              )}
 
-              {paymentFormData.paymentType === "MissedMealPenalty" && (
                 <div>
                   <label className="block text-gray-700 font-semibold mb-2">
-                    عدد الوجبات الفائتة
+                    نوع الدفع *
                   </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={paymentFormData.missedMealsCount}
+                  <select
+                    value={paymentFormData.paymentType}
                     onChange={(e) =>
                       setPaymentFormData({
                         ...paymentFormData,
-                        missedMealsCount: e.target.value,
+                        paymentType: e.target.value as any,
+                      })
+                    }
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="MonthlyFee">الإيجار الشهري</option>
+                    <option value="MissedMealPenalty">
+                      غرامة الوجبات الفائتة
+                    </option>
+                    <option value="Other">دفعة أخرى</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">
+                    المبلغ *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={paymentFormData.amount}
+                    onChange={(e) =>
+                      setPaymentFormData({
+                        ...paymentFormData,
+                        amount: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                    placeholder="أدخل المبلغ"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">
+                    تاريخ الدفع *
+                  </label>
+                  <input
+                    type="date"
+                    value={paymentFormData.paymentDate}
+                    onChange={(e) =>
+                      setPaymentFormData({
+                        ...paymentFormData,
+                        paymentDate: e.target.value,
                       })
                     }
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
                 </div>
-              )}
 
-              <div>
-                <label className="block text-gray-700 font-semibold mb-2">
-                  رقم الإيصال *
-                </label>
-                <input
-                  type="text"
-                  value={paymentFormData.receiptNumber}
-                  onChange={(e) =>
-                    setPaymentFormData({
-                      ...paymentFormData,
-                      receiptNumber: e.target.value.trim(), // Trim whitespace
-                    })
-                  }
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                  placeholder="أدخل رقم الإيصال"
-                  minLength={1} // Ensure it's not empty
-                />
-              </div>
-            </form>
+                {paymentFormData.paymentType === "MonthlyFee" && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-gray-700 font-semibold mb-2">
+                        الشهر
+                      </label>
+                      <select
+                        value={paymentFormData.month}
+                        onChange={(e) =>
+                          setPaymentFormData({
+                            ...paymentFormData,
+                            month: parseInt(e.target.value),
+                          })
+                        }
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                      >
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(
+                          (month) => (
+                            <option key={month} value={month}>
+                              {month}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-gray-700 font-semibold mb-2">
+                        السنة
+                      </label>
+                      <input
+                        type="number"
+                        value={paymentFormData.year}
+                        onChange={(e) =>
+                          setPaymentFormData({
+                            ...paymentFormData,
+                            year: parseInt(e.target.value),
+                          })
+                        }
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                        min="2020"
+                        max="2100"
+                      />
+                    </div>
+                  </div>
+                )}
 
-            <div className="p-6 border-t border-gray-200 shrink-0">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowPaymentModal(false)}
-                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  onClick={handlePaymentSubmit}
-                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-                >
-                  إضافة مدفوعات
-                </button>
+                {paymentFormData.paymentType === "MissedMealPenalty" && (
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      عدد الوجبات الفائتة
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={paymentFormData.missedMealsCount}
+                      onChange={(e) =>
+                        setPaymentFormData({
+                          ...paymentFormData,
+                          missedMealsCount: e.target.value,
+                        })
+                      }
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">
+                    رقم الإيصال *
+                  </label>
+                  <input
+                    type="text"
+                    value={paymentFormData.receiptNumber}
+                    onChange={(e) =>
+                      setPaymentFormData({
+                        ...paymentFormData,
+                        receiptNumber: e.target.value.trim(), // Trim whitespace
+                      })
+                    }
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                    placeholder="أدخل رقم الإيصال"
+                    minLength={1} // Ensure it's not empty
+                  />
+                </div>
+              </form>
+
+              <div className="p-6 border-t border-gray-200 shrink-0">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentModal(false)}
+                    className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    onClick={handlePaymentSubmit}
+                    className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                  >
+                    إضافة مدفوعات
+                  </button>
+                </div>
               </div>
             </div>
           </div>

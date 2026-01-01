@@ -452,7 +452,8 @@ export default function StudentForm() {
                             : "")
                         }
                         alt="Preview"
-                        className="w-40 h-40 max-w-[160px] max-h-[160px] rounded-lg object-cover border-4 border-white shadow"
+                        style={{ width: "200px", height: "200px" }}
+                        className="object-cover rounded-lg border-4 border-white shadow"
                       />
                       {photoUploaded && (
                         <button
@@ -465,7 +466,7 @@ export default function StudentForm() {
                       )}
                     </div>
                   ) : (
-                    <div className="w-40 h-40 max-w-[160px] max-h-[160px] rounded-lg bg-blue-100 flex items-center justify-center border-4 border-white shadow">
+                    <div className="w-[200px] h-[200px] rounded-lg bg-blue-100 flex items-center justify-center border-4 border-white shadow">
                       <User className="w-16 h-16 text-blue-600" />
                     </div>
                   )}
