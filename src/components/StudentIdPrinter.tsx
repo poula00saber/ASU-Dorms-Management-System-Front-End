@@ -22,7 +22,6 @@ interface Student {
   dormType?: string;
   government?: string;
   district?: string;
-  roomNumber?: string;
 }
 
 const dormLocationMap: Record<number, string> = {
@@ -118,7 +117,6 @@ export default function StudentIdPrinter() {
           dormType: student.dormType,
           government: student.government,
           district: student.district,
-          roomNumber: student.roomNumber,
         };
       });
 
@@ -202,16 +200,17 @@ export default function StudentIdPrinter() {
     setSelectedStudents([]);
     setSelectedAll(false);
   };
-const generatePrintContent = (studentsToPrint: Student[]) => {
-  // Group students into pages of 10
-  const pages: Student[][] = [];
-  for (let i = 0; i < studentsToPrint.length; i += 10) {
-    pages.push(studentsToPrint.slice(i, i + 10));
-  }
 
-  const currentYear = "2025-2026";
+  const generatePrintContent = (studentsToPrint: Student[]) => {
+    // Group students into pages of 10
+    const pages: Student[][] = [];
+    for (let i = 0; i < studentsToPrint.length; i += 10) {
+      pages.push(studentsToPrint.slice(i, i + 10));
+    }
 
-  return `
+    const currentYear = "2025-2026";
+
+    return `
     <!DOCTYPE html>
     <html dir="rtl" lang="ar">
     <head>
@@ -245,7 +244,7 @@ const generatePrintContent = (studentsToPrint: Student[]) => {
           min-height: 287mm;
           display: grid;
           grid-template-columns: repeat(2, 1fr);
-          gap: 2mm 6mm;
+          gap: 4mm 6mm;
           align-content: start;
           padding: 0;
         }
@@ -255,10 +254,10 @@ const generatePrintContent = (studentsToPrint: Student[]) => {
         }
         
         .id-card {
-          width: 95mm;
-          height: 54mm;
+          width: 76mm; /* Changed from 95mm to 76mm (80% of original) */
+          height: 50mm; /* Height remains the same */
           border: 1.8px solid #000;
-          border-radius: 4px;
+          border-radius: 8px; /* Added rounded corners */
           overflow: hidden;
           background: white;
           position: relative;
@@ -279,6 +278,8 @@ const generatePrintContent = (studentsToPrint: Student[]) => {
           padding: 0 3mm;
           position: relative;
           z-index: 10;
+          border-top-left-radius: 6px; /* Rounded top corners */
+          border-top-right-radius: 6px; /* Rounded top corners */
         }
         
         .header-year {
@@ -304,7 +305,7 @@ const generatePrintContent = (studentsToPrint: Student[]) => {
           top: 50%;
           left: 50%;
           transform: translate(-50%, -50%);
-          width: 40mm;
+          width: 32mm; /* Reduced from 40mm to match new width */
           height: auto;
           opacity: 0.4; /* Reduced opacity */
           pointer-events: none;
@@ -313,7 +314,7 @@ const generatePrintContent = (studentsToPrint: Student[]) => {
         
         /* ===== PHOTO ===== */
         .photo-section {
-          width: 30mm;
+          width: 26mm;
           padding: 1mm;
           display: flex;
           align-items: flex-start;
@@ -324,10 +325,11 @@ const generatePrintContent = (studentsToPrint: Student[]) => {
         }
         
         .photo {
-          width: 25mm;
-          height: 30mm;
+          width: 22mm; /* Reduced from 25mm (80% of original) */
+          height: 26mm; /* Reduced from 30mm (80% of original) */
           object-fit: cover;
           border: 1px solid #000;
+          border-radius: 3px; /* Added slight rounding to photo */
           margin-top: 1mm;
           background-color: white; /* Ensure photo has background */
           position: relative;
@@ -336,19 +338,17 @@ const generatePrintContent = (studentsToPrint: Student[]) => {
         
         /* ===== INFO SECTION ===== */
         .info-section {
-          flex: 1;
-          padding: 1mm 2mm;
-          display: flex;
-          flex-direction: column;
-          direction: rtl;
-          position: relative;
-          z-index: 5;
-        }
+  flex: 1;
+  padding: 1mm 2mm;
+  display: grid;
+  grid-template-rows: auto auto auto auto 1fr auto;
+}
+
         
         /* Student Name - Centered and Larger */
         .student-name {
           font-weight: bold;
-          font-size: 11pt;
+          font-size: 10pt; /* Reduced from 11pt */
           text-align: center;
           color: #c62828;
           margin: 0.5mm 0 2mm 0;
@@ -362,20 +362,18 @@ const generatePrintContent = (studentsToPrint: Student[]) => {
         
         /* Info container for all details */
         .info-container {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 1.2mm;
-          padding: 0 1mm;
-          position: relative;
-          z-index: 5;
-        }
+  display: flex;
+  flex-direction: column;
+  gap: 1.2mm;
+  padding: 0 1mm;
+}
+
         
         /* Inline label-value pairs */
         .info-row {
           display: flex;
           align-items: center;
-          font-size: 9pt;
+          font-size: 8.5pt; /* Reduced from 9pt */
           position: relative;
           z-index: 5;
           /* REMOVED background-color to allow logo to show through */
@@ -383,7 +381,7 @@ const generatePrintContent = (studentsToPrint: Student[]) => {
         
         .info-label {
           font-weight: bold;
-          min-width: 18mm;
+          min-width: 14mm; /* Reduced from 18mm */
           text-align: left;
         }
         
@@ -400,24 +398,22 @@ const generatePrintContent = (studentsToPrint: Student[]) => {
         .student-id-value {
           font-family: monospace;
           font-weight: bold;
-          font-size: 9.5pt;
+          font-size: 9pt; /* Reduced from 9.5pt */
         }
         
         /* ===== BARCODE ===== */
-        .barcode-section {
-          text-align: center;
-          margin-top: auto;
-          padding-top: 1mm;
-          border-top: 1px solid #eee;
-          position: relative;
-          z-index: 5;
-          /* REMOVED background-color to allow logo to show through */
-        }
-        
-        .barcode-section img {
-          width: 45mm;
-          height: 9mm;
-        }
+       .barcode-section {
+  border-top: 1px solid #eee;
+  margin-top: 3mm;
+  padding-top: 0.5mm;
+}
+
+.barcode-section img {
+  display: block;      /* removes inline image baseline gap */
+  margin: 0 auto;
+  width: 45mm;
+  height: 9mm;
+}
         
         @media print {
           body {
@@ -431,20 +427,29 @@ const generatePrintContent = (studentsToPrint: Student[]) => {
             margin: 0;
             width: 100%;
             height: 100%;
+            gap: 5mm 8mm; /* Increased horizontal gap for better spacing */
           }
           
           .id-card {
             box-shadow: none;
             border: 1.5px solid #000;
+            border-radius: 8px;
           }
           
           .card-header {
             -webkit-print-color-adjust: exact;
             color-adjust: exact;
+            border-top-left-radius: 6px;
+            border-top-right-radius: 6px;
           }
           
           .university-logo {
             opacity: 0.15; /* Slightly more visible for print */
+            width: 32mm;
+          }
+          
+          .photo {
+            border-radius: 3px;
           }
         }
       </style>
@@ -547,7 +552,7 @@ const generatePrintContent = (studentsToPrint: Student[]) => {
     </body>
     </html>
   `;
-};
+  };
 
   // Handle print all
   const handlePrintAll = () => {
