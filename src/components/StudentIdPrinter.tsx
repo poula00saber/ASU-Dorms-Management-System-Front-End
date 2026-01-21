@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Printer, Users, CheckSquare, Loader2, Search } from "lucide-react";
 import JsBarcode from "jsbarcode";
 import { toast } from "sonner";
-import { API_BASE } from "../lib/api";
+import { fetchAPI } from "../lib/api"; // Changed to fetchAPI
 import { resolvePhotoUrl } from "../utils/resolvePhotoUrl";
 
 interface Student {
@@ -34,7 +34,7 @@ const dormLocationMap: Record<number, string> = {
   7: "الزيتون",
 };
 
-// Arabic translations for dorm types
+// Arabic translations for dorm types (kept for potential future use)
 const dormTypeTranslations: Record<string, string> = {
   "1": "عادي",
   "2": "مميز",
@@ -53,6 +53,8 @@ export default function StudentIdPrinter() {
   const [currentDormLocation, setCurrentDormLocation] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterFaculty, setFilterFaculty] = useState("all");
+  const [filterBuilding, setFilterBuilding] = useState("all");
+  const [filterLevel, setFilterLevel] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
   const [selectedAll, setSelectedAll] = useState(false);
 
@@ -61,36 +63,8 @@ export default function StudentIdPrinter() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("يرجى تسجيل الدخول أولاً");
-      }
-
-      // Get students for printing - API will automatically filter by current user's dorm location
-      // Correct endpoint: /api/Students/print-data
-      const response = await fetch(`${API_BASE}/api/Students/print-data`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("غير مصرح لك بالوصول. يرجى تسجيل الدخول مرة أخرى.");
-        }
-        if (response.status === 403) {
-          throw new Error("ليس لديك صلاحية للوصول إلى هذه الصفحة.");
-        }
-        if (response.status === 404) {
-          throw new Error(
-            "لم يتم العثور على نهاية الرابط. يرجى التحقق من الإعدادات."
-          );
-        }
-        throw new Error(`خطأ في الخادم: ${response.status}`);
-      }
-
-      const data = await response.json();
+      // Use fetchAPI instead of direct fetch
+      const data = await fetchAPI("/api/Students/print-data");
 
       // Transform API data to match our interface
       const transformedStudents: Student[] = data.map((student: any) => {
@@ -111,7 +85,6 @@ export default function StudentIdPrinter() {
           building: student.building || student.buildingNumber || "",
           buildingNumber: student.buildingNumber || "",
           photoUrl: resolvePhotoUrl(student.photoUrl),
-
           dormLocationName:
             student.dormLocationName || dormLocationMap[student.dormLocationId],
           dormType: student.dormType,
@@ -135,7 +108,22 @@ export default function StudentIdPrinter() {
         error.message ||
         "فشل في تحميل بيانات الطلاب. الرجاء المحاولة مرة أخرى.";
       setError(errorMessage);
-      toast.error(errorMessage);
+
+      // Handle specific error cases
+      if (
+        error.message?.includes("401") ||
+        error.message?.includes("غير مصرح")
+      ) {
+        toast.error("غير مصرح لك بالوصول. يرجى تسجيل الدخول مرة أخرى.");
+      } else if (error.message?.includes("403")) {
+        toast.error("ليس لديك صلاحية للوصول إلى هذه الصفحة.");
+      } else if (error.message?.includes("404")) {
+        toast.error(
+          "لم يتم العثور على نهاية الرابط. يرجى التحقق من الإعدادات."
+        );
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -603,7 +591,30 @@ export default function StudentIdPrinter() {
     };
   };
 
-  // Filter students based on search and faculty filter
+  // Get unique values for filters
+  const uniqueFaculties = [
+    ...new Set(students.map((s) => s.faculty).filter(Boolean)),
+  ];
+
+  const uniqueBuildings = [
+    ...new Set(
+      students
+        .map((s) => s.building || s.buildingNumber)
+        .filter(Boolean)
+        .sort()
+    ),
+  ];
+
+  const uniqueLevels = [
+    ...new Set(
+      students
+        .map((s) => s.level?.toString())
+        .filter(Boolean)
+        .sort()
+    ),
+  ];
+
+  // Filter students based on search and all filters
   const filteredStudents = students.filter((student) => {
     const studentName =
       student.fullName || `${student.firstName} ${student.lastName}`;
@@ -618,13 +629,14 @@ export default function StudentIdPrinter() {
     const matchesFaculty =
       filterFaculty === "all" || student.faculty === filterFaculty;
 
-    return matchesSearch && matchesFaculty;
-  });
+    const matchesBuilding =
+      filterBuilding === "all" || student.building === filterBuilding;
 
-  // Get unique faculties for filter dropdown
-  const uniqueFaculties = [
-    ...new Set(students.map((s) => s.faculty).filter(Boolean)),
-  ];
+    const matchesLevel =
+      filterLevel === "all" || student.level?.toString() === filterLevel;
+
+    return matchesSearch && matchesFaculty && matchesBuilding && matchesLevel;
+  });
 
   if (loading && students.length === 0) {
     return (
@@ -712,17 +724,18 @@ export default function StudentIdPrinter() {
           </button>
         </div>
 
-        {showFilters && uniqueFaculties.length > 0 && (
+        {showFilters && (
           <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Faculty filter */}
               <div>
-                <label className="block text-gray-700 mb-2 text-right">
+                <label className="block text-gray-700 mb-2 text-right text-sm">
                   الكلية
                 </label>
                 <select
                   value={filterFaculty}
                   onChange={(e) => setFilterFaculty(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-right text-sm"
                   dir="rtl"
                   disabled={loading}
                 >
@@ -734,7 +747,67 @@ export default function StudentIdPrinter() {
                   ))}
                 </select>
               </div>
+
+              {/* Building filter */}
+              <div>
+                <label className="block text-gray-700 mb-2 text-right text-sm">
+                  المبنى
+                </label>
+                <select
+                  value={filterBuilding}
+                  onChange={(e) => setFilterBuilding(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-right text-sm"
+                  dir="rtl"
+                  disabled={loading}
+                >
+                  <option value="all">جميع المباني</option>
+                  {uniqueBuildings.map((building) => (
+                    <option key={building} value={building}>
+                      {building || "غير محدد"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Level filter */}
+              <div>
+                <label className="block text-gray-700 mb-2 text-right text-sm">
+                  المستوى
+                </label>
+                <select
+                  value={filterLevel}
+                  onChange={(e) => setFilterLevel(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-right text-sm"
+                  dir="rtl"
+                  disabled={loading}
+                >
+                  <option value="all">جميع المستويات</option>
+                  {uniqueLevels.map((level) => (
+                    <option key={level} value={level}>
+                      {level}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
+
+            {/* Reset filters button */}
+            {(filterFaculty !== "all" ||
+              filterBuilding !== "all" ||
+              filterLevel !== "all") && (
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={() => {
+                    setFilterFaculty("all");
+                    setFilterBuilding("all");
+                    setFilterLevel("all");
+                  }}
+                  className="px-4 py-2 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  إعادة تعيين الفلتر
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

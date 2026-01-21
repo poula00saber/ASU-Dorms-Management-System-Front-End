@@ -1,3 +1,4 @@
+// src/components/Layout.tsx
 import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -13,8 +14,14 @@ import {
   X,
   Utensils,
   CreditCard,
+  ChevronDown,
 } from "lucide-react";
-import { API_BASE } from "../lib/api";
+import {
+  fetchAPI, // ✅ Add fetchAPI import
+  getUserInfo,
+  getActiveDormLocationId,
+  setActiveDormLocationId,
+} from "../lib/api";
 
 export type UserRole = "registration" | "restaurant" | "user";
 
@@ -28,10 +35,33 @@ export default function Layout({ children, userRole, onLogout }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [allowCombinedScan, setAllowCombinedScan] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
+  const [selectedDormId, setSelectedDormId] = useState<number>(0);
+  const [accessibleDorms, setAccessibleDorms] = useState<
+    Record<number, string>
+  >({});
+  const [currentUserId, setCurrentUserId] = useState<number>(0);
   const location = useLocation();
 
-  // Fetch settings for restaurant users
+  // Dorm location names mapping
+  const dormLocationMap: Record<number, string> = {
+    1: "مدينة طلبة العباسية",
+    2: "مدينة طالبات مصر الجديدة",
+    3: "مدينة نصر 1",
+    4: "مدينة نصر 2",
+    5: "زراعة أ",
+    6: "زراعة ب",
+    7: "الزيتون",
+  };
+
+  // Load user info and dorm settings
   useEffect(() => {
+    const userInfo = getUserInfo();
+    if (userInfo) {
+      setCurrentUserId(userInfo.userId);
+      setAccessibleDorms(userInfo.accessibleDormLocations);
+      setSelectedDormId(getActiveDormLocationId());
+    }
+
     if (userRole === "restaurant") {
       fetchRestaurantSettings();
     } else {
@@ -41,20 +71,21 @@ export default function Layout({ children, userRole, onLogout }: LayoutProps) {
 
   const fetchRestaurantSettings = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/api/Meals/settings`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setAllowCombinedScan(data.allowCombinedMealScan);
-      }
+      // ✅ Use fetchAPI instead of direct fetch
+      const data = await fetchAPI("/api/Meals/settings");
+      setAllowCombinedScan(data.allowCombinedMealScan);
     } catch (err) {
       console.error("Failed to load settings:", err);
     } finally {
       setLoadingSettings(false);
     }
+  };
+
+  const handleDormChange = (dormId: number) => {
+    setSelectedDormId(dormId);
+    setActiveDormLocationId(dormId);
+    // Reload the page to fetch new dorm data
+    window.location.reload();
   };
 
   const registrationMenu = [
@@ -67,7 +98,6 @@ export default function Layout({ children, userRole, onLogout }: LayoutProps) {
     { icon: Utensils, label: "طباعة الكارنيهات", path: "/print-ids" },
   ];
 
-  // Dynamic restaurant menu based on settings
   const restaurantMenu = allowCombinedScan
     ? [
         { icon: LayoutDashboard, label: "لوحة التحكم", path: "/" },
@@ -83,11 +113,11 @@ export default function Layout({ children, userRole, onLogout }: LayoutProps) {
         { icon: Scan, label: "ماسح الغداء", path: "/scanner/lunch" },
       ];
 
-const userMenu = [
-  { icon: Calendar, label: "الإجازات", path: "/holidays" },
-  { icon: CreditCard, label: "المدفوعات", path: "/payments" },
-];
-  // Select menu based on role
+  const userMenu = [
+    { icon: Calendar, label: "الإجازات", path: "/holidays" },
+    { icon: CreditCard, label: "المدفوعات", path: "/payments" },
+  ];
+
   const menuItems =
     userRole === "registration"
       ? registrationMenu
@@ -95,7 +125,10 @@ const userMenu = [
       ? restaurantMenu
       : userMenu;
 
-  // Get role display name
+  // Check if user can access multiple dorms (more than 1 location)
+  const canAccessMultipleDorms =
+    userRole === "registration" && Object.keys(accessibleDorms).length > 1;
+
   const getRoleDisplayName = () => {
     switch (userRole) {
       case "registration":
@@ -270,15 +303,64 @@ const userMenu = [
       <div className="md:pl-64 h-screen overflow-y-auto">
         {/* Top Bar */}
         <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+          {/* Dorm Selector Navigation - Only for Multi-Dorm Users */}
+          {canAccessMultipleDorms && userRole === "registration" && (
+            <div
+              className="bg-gradient-to-r from-blue-50 to-purple-50 border-b border-blue-200"
+              dir="rtl"
+            >
+              <div className="px-4 md:px-8 py-3">
+                <div className="flex items-center gap-3">
+                  <Building2 className="w-5 h-5 text-blue-600" />
+                  <span className="text-sm font-semibold text-gray-700">
+                    اختر موقع السكن:
+                  </span>
+                  <div className="flex-1 flex items-center gap-2 overflow-x-auto">
+                    {Object.entries(accessibleDorms)
+                      .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                      .map(([id, name]) => {
+                        const dormId = parseInt(id);
+                        const isActive = dormId === selectedDormId;
+                        return (
+                          <button
+                            key={id}
+                            onClick={() => handleDormChange(dormId)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                              isActive
+                                ? "bg-blue-600 text-white shadow-md"
+                                : "bg-white text-gray-700 hover:bg-blue-50 border border-gray-200"
+                            }`}
+                          >
+                            {dormLocationMap[dormId] || name}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Main Header */}
           <div className="flex items-center justify-between px-4 md:px-8 py-4">
             <button onClick={() => setSidebarOpen(true)} className="md:hidden">
               <Menu className="w-6 h-6 text-gray-600" />
             </button>
 
-            <h1 className="text-xl font-bold text-gray-900">
-              {menuItems.find((item) => item.path === location.pathname)
-                ?.label || "لوحة التحكم"}
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold text-gray-900">
+                {menuItems.find((item) => item.path === location.pathname)
+                  ?.label || "لوحة التحكم"}
+              </h1>
+
+              {/* Show current dorm badge for User 2 */}
+              {canAccessMultipleDorms && userRole === "registration" && (
+                <span className="hidden sm:inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                  <Building2 className="w-3 h-3" />
+                  {dormLocationMap[selectedDormId]}
+                </span>
+              )}
+            </div>
 
             <div className="flex items-center gap-4">
               <div className="text-right hidden sm:block">

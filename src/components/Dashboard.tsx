@@ -21,7 +21,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { API_BASE } from "../lib/api";
+import { fetchAPI, getActiveDormLocationId } from "../lib/api";
 import { Bold } from "lucide-react";
+
 
 interface DashboardProps {
   userRole: "registration" | "restaurant";
@@ -72,9 +74,7 @@ interface RegistrationDashboardData {
   }>;
 }
 
-
 export default function Dashboard({ userRole }: DashboardProps) {
- 
   return <RegistrationDashboard />;
 }
 
@@ -99,44 +99,23 @@ function RegistrationDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const fetchRegistrationData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+ const fetchRegistrationData = async () => {
+   try {
+     setLoading(true);
+     setError(null);
 
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("لم يتم العثور على رمز المصادقة");
-      }
-
-      const response = await fetch(
-        `${API_BASE}/api/Reports/registration/dashboard`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        if (response.status === 401) throw new Error("غير مصرح بالوصول");
-        if (response.status === 404)
-          throw new Error("لم يتم العثور على بيانات موقع السكن");
-        throw new Error(`خطأ HTTP: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setStats(data);
-      setLastUpdated(new Date().toLocaleTimeString("ar-EG"));
-    } catch (err: any) {
-      console.error("Fetch error:", err);
-      setError(err.message);
-      toast.error("فشل تحميل بيانات لوحة التحكم");
-    } finally {
-      setLoading(false);
-    }
-  };
+     // Use fetchAPI instead of direct fetch
+     const data = await fetchAPI("/api/Reports/registration/dashboard");
+     setStats(data);
+     setLastUpdated(new Date().toLocaleTimeString("ar-EG"));
+   } catch (err: any) {
+     console.error("Fetch error:", err);
+     setError(err.message);
+     toast.error("فشل تحميل بيانات لوحة التحكم");
+   } finally {
+     setLoading(false);
+   }
+ };
 
   if (loading) {
     return (

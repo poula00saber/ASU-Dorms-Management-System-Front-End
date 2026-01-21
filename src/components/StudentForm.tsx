@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save, Upload, User, X } from "lucide-react";
 import { toast } from "sonner";
-import { API_BASE } from "../lib/api";
+import { fetchAPI } from "../lib/api";
+import { resolvePhotoUrl } from "../utils/resolvePhotoUrl";
 
 export default function StudentForm() {
   const navigate = useNavigate();
@@ -11,7 +12,7 @@ export default function StudentForm() {
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [photoUploaded, setPhotoUploaded] = useState(false); // ADD THIS LINE
+  const [photoUploaded, setPhotoUploaded] = useState(false);
 
   // Ain Shams University Faculties
   const ainShamsFaculties = [
@@ -120,6 +121,9 @@ export default function StudentForm() {
   const [loading, setLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
 
+  // Resolve photo URL for display
+  const displayPhotoUrl = resolvePhotoUrl(formData.photoUrl);
+
   const handleChange = (e) => {
     const { name, value, type } = e.target;
     setFormData((prev) => ({
@@ -136,21 +140,35 @@ export default function StudentForm() {
     const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif"];
     if (!validTypes.includes(file.type)) {
       toast.error("الرجاء اختيار صورة بصيغة JPG, JPEG, PNG أو GIF");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       return;
     }
 
     // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("حجم الصورة يجب أن يكون أقل من 5 ميجابايت");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       return;
     }
 
     setSelectedFile(file);
 
-    // Create preview URL
+    // Create preview URL using FileReader
     const reader = new FileReader();
     reader.onloadend = () => {
       setPreviewUrl(reader.result);
+    };
+    reader.onerror = () => {
+      toast.error("حدث خطأ أثناء قراءة الصورة");
+      setSelectedFile(null);
+      setPreviewUrl("");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -169,34 +187,20 @@ export default function StudentForm() {
     setUploadingPhoto(true);
 
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        toast.error("لم يتم العثور على رمز المصادقة");
-        navigate("/");
-        return;
-      }
-
       const formDataObj = new FormData();
       formDataObj.append("file", selectedFile);
 
-      const response = await fetch(
-        `${API_BASE}/api/Students/${formData.studentId}/photo`,
+      // Use fetchAPI for photo upload with FormData
+      const result = await fetchAPI(
+        `/api/Students/${formData.studentId}/photo`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
           body: formDataObj,
+          // DO NOT set Content-Type header for FormData
         }
       );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || `خطأ في رفع الصورة: ${response.status}`);
-      }
-
-      const result = await response.json();
-      const photoUrl = result.photoUrl;
+      const photoUrl = result.photoUrl || result;
 
       // Update form data with the new photo URL
       setFormData((prev) => ({
@@ -206,9 +210,10 @@ export default function StudentForm() {
 
       toast.success("تم رفع الصورة بنجاح");
 
-      // Clear selected file and preview
-      setPhotoUploaded(true); // ADD THIS LINE
+      // Clear selected file but keep the preview for now
+      setPhotoUploaded(true);
       setSelectedFile(null);
+      // Don't clear previewUrl - keep showing the uploaded image
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -225,8 +230,12 @@ export default function StudentForm() {
       ...prev,
       photoUrl: "",
     }));
-    setPreviewUrl(""); // ADD THIS
-    setPhotoUploaded(false); // ADD THIS
+    setPreviewUrl("");
+    setSelectedFile(null);
+    setPhotoUploaded(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -234,22 +243,7 @@ export default function StudentForm() {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem("token");
-
-      if (!token) {
-        toast.error(
-          "لم يتم العثور على رمز المصادقة. يرجى تسجيل الدخول مرة أخرى."
-        );
-        navigate("/");
-        return;
-      }
-
-      // Debug: Check what photoUrl we have
-      console.log("photoUrl before submission:", formData.photoUrl);
-      console.log("Is photoUrl empty?", !formData.photoUrl);
-      console.log("Is photoUrl null?", formData.photoUrl === null);
-
-      // Prepare the data - IMPORTANT: Send empty string instead of null for PhotoUrl
+      // Prepare the data
       const studentData = {
         studentId: formData.studentId,
         nationalId: formData.nationalId,
@@ -262,15 +256,15 @@ export default function StudentForm() {
         religion: parseInt(formData.religion),
         government: formData.government,
         district: formData.district,
-        streetName: formData.streetName || "", // Use empty string instead of null
+        streetName: formData.streetName || "",
         faculty: formData.faculty,
         level: parseInt(formData.level),
         grade: formData.grade,
         percentageGrade: formData.percentageGrade
           ? parseFloat(formData.percentageGrade)
           : null,
-        secondarySchoolName: formData.secondarySchoolName || "", // Use empty string instead of null
-        secondarySchoolGovernment: formData.secondarySchoolGovernment || "", // Use empty string instead of null
+        secondarySchoolName: formData.secondarySchoolName || "",
+        secondarySchoolGovernment: formData.secondarySchoolGovernment || "",
         highSchoolPercentage: formData.highSchoolPercentage
           ? parseFloat(formData.highSchoolPercentage)
           : null,
@@ -280,45 +274,29 @@ export default function StudentForm() {
         hasSpecialNeeds: formData.hasSpecialNeeds,
         specialNeedsDetails: formData.hasSpecialNeeds
           ? formData.specialNeedsDetails || ""
-          : "", // Use empty string instead of null
+          : "",
         isExemptFromFees: formData.isExemptFromFees,
         fatherName: formData.fatherName,
         fatherNationalId: formData.fatherNationalId,
-        fatherProfession: formData.fatherProfession || "", // Use empty string instead of null
+        fatherProfession: formData.fatherProfession || "",
         fatherPhone: formData.fatherPhone,
         guardianName: formData.guardianName,
         guardianRelationship: formData.guardianRelationship,
         guardianPhone: formData.guardianPhone,
-        photoUrl: formData.photoUrl || "", // Use empty string instead of null
+        photoUrl: formData.photoUrl || "",
       };
 
       console.log("Student data being sent:", studentData);
-      console.log("PhotoUrl in data:", studentData.photoUrl);
 
-      const url = isEditMode
-        ? `${API_BASE}/api/Students/${id}`
-        : `${API_BASE}/api/Students`;
-
+      const endpoint = isEditMode ? `/api/Students/${id}` : `/api/Students`;
       const method = isEditMode ? "PUT" : "POST";
 
-      const response = await fetch(url, {
+      // Use fetchAPI for student data submission
+      const result = await fetchAPI(endpoint, {
         method: method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(studentData),
       });
 
-      console.log("Response status:", response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Error response:", errorText);
-        throw new Error(errorText || `خطأ HTTP! الحالة: ${response.status}`);
-      }
-
-      const result = await response.json();
       console.log("Success:", result);
 
       toast.success(
@@ -338,25 +316,8 @@ export default function StudentForm() {
 
     const fetchStudent = async () => {
       try {
-        const token = localStorage.getItem("token");
-
-        if (!token) {
-          toast.error("لم يتم العثور على رمز المصادقة");
-          navigate("/");
-          return;
-        }
-
-        const response = await fetch(`${API_BASE}/api/Students/${id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`خطأ HTTP! الحالة: ${response.status}`);
-        }
-
-        const data = await response.json();
+        // Use fetchAPI to get student data
+        const data = await fetchAPI(`/api/Students/${id}`);
 
         setFormData({
           studentId: data.studentId || "",
@@ -439,23 +400,30 @@ export default function StudentForm() {
               {/* Photo Preview */}
               <div className="flex flex-col items-center gap-4">
                 <div className="relative">
-                  {previewUrl || formData.photoUrl ? (
+                  {previewUrl || displayPhotoUrl ? (
                     <div className="relative">
                       <img
-                        src={
-                          previewUrl ||
-                          (formData.photoUrl &&
-                          formData.photoUrl.startsWith("http")
-                            ? formData.photoUrl
-                            : formData.photoUrl
-                            ? `${API_BASE}${formData.photoUrl}`
-                            : "")
-                        }
+                        src={previewUrl || displayPhotoUrl}
                         alt="Preview"
                         style={{ width: "200px", height: "200px" }}
                         className="object-cover rounded-lg border-4 border-white shadow"
+                        onError={(e) => {
+                          // If image fails to load, show fallback
+                          console.error("Image failed to load:", e);
+                          e.target.style.display = "none";
+                          const parent = e.target.parentElement;
+                          if (parent) {
+                            parent.innerHTML = `
+                              <div class="w-[200px] h-[200px] rounded-lg bg-blue-100 flex items-center justify-center border-4 border-white shadow">
+                                <svg class="w-16 h-16 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                </svg>
+                              </div>
+                            `;
+                          }
+                        }}
                       />
-                      {photoUploaded && (
+                      {(selectedFile || photoUploaded) && (
                         <button
                           type="button"
                           onClick={removePhoto}
@@ -498,10 +466,29 @@ export default function StudentForm() {
                       <button
                         type="button"
                         onClick={handleUploadPhoto}
-                        disabled={uploadingPhoto}
-                        className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                        disabled={uploadingPhoto || !formData.studentId}
+                        className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {uploadingPhoto ? "جاري الرفع..." : "رفع الصورة"}
+                      </button>
+                      {!formData.studentId && (
+                        <p className="text-sm text-red-600 mt-1">
+                          يرجى إدخال رقم الملف أولاً
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {displayPhotoUrl && !selectedFile && !photoUploaded && (
+                    <div className="text-center">
+                      
+                      <button
+                        type="button"
+                        onClick={removePhoto}
+                        className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                        حذف الصورة
                       </button>
                     </div>
                   )}

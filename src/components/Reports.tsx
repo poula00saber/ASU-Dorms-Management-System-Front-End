@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Download, Calendar, Users, AlertCircle, FileDown } from "lucide-react";
 import { toast } from "sonner";
-import { API_BASE } from "../lib/api";
+import { fetchAPI } from "../lib/api"; // Changed to fetchAPI
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 
@@ -9,8 +9,12 @@ type ReportType = "daily" | "monthly";
 
 export default function Reports() {
   const [activeReport, setActiveReport] = useState<ReportType>("daily");
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
-  const [dateFrom, setDateFrom] = useState(new Date(new Date().setDate(1)).toISOString().split("T")[0]);
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [dateFrom, setDateFrom] = useState(
+    new Date(new Date().setDate(1)).toISOString().split("T")[0]
+  );
   const [dateTo, setDateTo] = useState(new Date().toISOString().split("T")[0]);
   const [selectedBuilding, setSelectedBuilding] = useState("all");
 
@@ -19,7 +23,9 @@ export default function Reports() {
       {/* Header */}
       <div className="">
         <h1 className="text-3xl font-bold text-gray-900">التقارير</h1>
-        <p className="text-gray-600 mt-1">تقارير الغياب اليومية والشهرية للطلاب</p>
+        <p className="text-gray-600 mt-1">
+          تقارير الغياب اليومية والشهرية للطلاب
+        </p>
       </div>
 
       {/* Report Type Selector */}
@@ -87,7 +93,7 @@ const exportTableToPDF = (tableId: string, title: string) => {
   doc.html(table, {
     margin: { top: 60, left: 30 },
     callback: () => doc.save(`${title}.pdf`),
-    html2canvas: { scale: 0.6 }
+    html2canvas: { scale: 0.6 },
   });
 };
 
@@ -118,16 +124,11 @@ function DailyReport({
   const fetchDailyReport = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
 
-      const res = await fetch(
-        `${API_BASE}/api/Reports/daily-absence?date=${selectedDate}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+      // Use fetchAPI instead of direct fetch
+      const data = await fetchAPI(
+        `/api/Reports/daily-absence?date=${selectedDate}`
       );
-
-      if (!res.ok) throw new Error("فشل في تحميل التقرير");
-
-      const data = await res.json();
       setReportData(data);
     } catch (err: any) {
       toast.error(err.message || "حدث خطأ أثناء تحميل التقرير");
@@ -323,21 +324,14 @@ function MonthlyReport({
   const fetchMonthlyReport = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
 
+      // Use fetchAPI instead of direct fetch
       const params = new URLSearchParams({
         fromDate: dateFrom,
         toDate: dateTo,
       });
 
-      const res = await fetch(
-        `${API_BASE}/api/Reports/monthly-absence?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (!res.ok) throw new Error("فشل في تحميل التقرير");
-
-      const data = await res.json();
+      const data = await fetchAPI(`/api/Reports/monthly-absence?${params}`);
       setReportData(data);
     } catch (err: any) {
       toast.error(err.message || "حدث خطأ أثناء تحميل التقرير");
@@ -463,7 +457,8 @@ function MonthlyReport({
             >
               <div className="p-6 border-b flex justify-between">
                 <h2 className="text-xl font-bold text-gray-900">
-                  مبنى {building.buildingNumber} – {building.students.length} طالب
+                  مبنى {building.buildingNumber} – {building.students.length}{" "}
+                  طالب
                 </h2>
               </div>
 

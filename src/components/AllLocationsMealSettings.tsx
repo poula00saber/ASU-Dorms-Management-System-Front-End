@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Settings, Save, Power, PowerOff, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { API_BASE } from "../lib/api";
+import { fetchAPI } from "../lib/api"; // ✅ Changed to fetchAPI
 
 interface DormLocationSetting {
   id: number;
@@ -12,16 +12,16 @@ interface DormLocationSetting {
 
 export default function AllLocationsMealSettings() {
   const [locations, setLocations] = useState<DormLocationSetting[]>([]);
-  
-const dormLocationMap: Record<number, string> = {
-  1: "مدينة طلبة العباسية",
-  2: "مدينة طالبات مصر الجديدة",
-  3: "مدينة نصر 1",
-  4: "مدينة نصر 2",
-  5: "زراعة أ",
-  6: "زراعة ب",
-  7: "الزيتون",
-};
+
+  const dormLocationMap: Record<number, string> = {
+    1: "مدينة طلبة العباسية",
+    2: "مدينة طالبات مصر الجديدة",
+    3: "مدينة نصر 1",
+    4: "مدينة نصر 2",
+    5: "زراعة أ",
+    6: "زراعة ب",
+    7: "الزيتون",
+  };
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -37,13 +37,8 @@ const dormLocationMap: Record<number, string> = {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/api/Meals/all-locations-settings`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!res.ok) throw new Error("فشل في تحميل الإعدادات");
-      const data = await res.json();
+      // ✅ Use fetchAPI instead of direct fetch
+      const data = await fetchAPI("/api/Meals/all-locations-settings");
       setLocations(data.dormLocations || []);
     } catch (err: any) {
       toast.error(err.message || "حدث خطأ أثناء تحميل الإعدادات");
@@ -57,20 +52,14 @@ const dormLocationMap: Record<number, string> = {
     newValue: boolean
   ) => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/api/Meals/location-setting`, {
+      // ✅ Use fetchAPI for PUT request
+      await fetchAPI("/api/Meals/location-setting", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           dormLocationId: locationId,
           allowCombinedMealScan: newValue,
         }),
       });
-
-      if (!res.ok) throw new Error("فشل في تحديث الإعدادات");
 
       setLocations((prev) =>
         prev.map((loc) =>
@@ -96,19 +85,13 @@ const dormLocationMap: Record<number, string> = {
 
     try {
       setSaving(true);
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/api/Meals/bulk-update-all`, {
+      // ✅ Use fetchAPI for bulk update
+      await fetchAPI("/api/Meals/bulk-update-all", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           allowCombinedMealScan: bulkAction === "enable",
         }),
       });
-
-      if (!res.ok) throw new Error("فشل في تحديث الإعدادات");
 
       setLocations((prev) =>
         prev.map((loc) =>
@@ -401,3 +384,4 @@ const dormLocationMap: Record<number, string> = {
     </div>
   );
 }
+  

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Plus, Calendar, Trash2, Search, X } from "lucide-react";
+import { Plus, Calendar, Trash2, Search, X, User,Clock } from "lucide-react";
+import { fetchAPI } from "../lib/api"; // ✅ Import fetchAPI
 
-import { API_BASE } from "../lib/api";
 
 interface Student {
   studentId: string;
@@ -17,6 +17,8 @@ interface Holiday {
   studentId: string;
   startDate: string;
   endDate: string;
+  modifiedBy: string; // Add this
+  lastModifiedDate: string; // Add this
 }
 
 export default function HolidayManagerArabic() {
@@ -57,14 +59,8 @@ export default function HolidayManagerArabic() {
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/api/Students`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!res.ok) throw new Error("فشل في تحميل الطلاب");
-      const data = await res.json();
+      // ✅ Use fetchAPI instead of direct fetch
+      const data = await fetchAPI("/api/Students");
       setStudents(data || []);
       setFilteredStudents(data || []);
     } catch (err: any) {
@@ -76,14 +72,8 @@ export default function HolidayManagerArabic() {
 
   const fetchStudentHolidays = async (studentId: string) => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/api/Holidays/student/${studentId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!res.ok) throw new Error("فشل في تحميل الإجازات");
-      const data = await res.json();
+      // ✅ Use fetchAPI instead of direct fetch
+      const data = await fetchAPI(`/api/Holidays/student/${studentId}`);
       setStudentHolidays(data || []);
     } catch (err: any) {
       alert(err.message || "حدث خطأ أثناء تحميل الإجازات");
@@ -105,28 +95,22 @@ export default function HolidayManagerArabic() {
     if (!selectedStudent) return;
 
     try {
-      const token = localStorage.getItem("token");
       const payload = {
-        studentNationalId: selectedStudent.nationalId, // CHANGED: Send nationalId
+        studentNationalId: selectedStudent.nationalId,
         startDate: formData.startDate,
         endDate: formData.endDate,
       };
 
-      const res = await fetch(`${API_BASE}/api/Holidays`, {
+      // ✅ Use fetchAPI for POST request too
+      await fetchAPI("/api/Holidays", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(payload),
       });
-
-      if (!res.ok) throw new Error("فشل في إضافة الإجازة");
 
       alert("تمت إضافة الإجازة بنجاح");
       setShowModal(false);
       setFormData({ startDate: "", endDate: "" });
-      fetchStudentHolidays(selectedStudent.studentId); // Still use studentId for fetching
+      fetchStudentHolidays(selectedStudent.studentId);
     } catch (err: any) {
       alert(err.message || "حدث خطأ أثناء إضافة الإجازة");
     }
@@ -136,15 +120,10 @@ export default function HolidayManagerArabic() {
     if (!confirm("هل أنت متأكد من حذف هذه الإجازة؟")) return;
 
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/api/Holidays/${holidayId}`, {
+      // ✅ Use fetchAPI for DELETE request
+      await fetchAPI(`/api/Holidays/${holidayId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
-
-      if (!res.ok) throw new Error("فشل في حذف الإجازة");
 
       alert("تم حذف الإجازة بنجاح");
       if (selectedStudent) {
@@ -155,6 +134,38 @@ export default function HolidayManagerArabic() {
     }
   };
 
+  const formatDateTime = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+
+      // Check if the date is in UTC (ends with Z or has T and ends with time)
+      const isUTC =
+        dateString.includes("T") &&
+        (dateString.endsWith("Z") ||
+          (dateString.includes(":") && dateString.includes(".")));
+
+      let displayDate = date;
+
+      // If it's UTC, convert to Egypt time (UTC+2)
+      if (isUTC) {
+        // Add 2 hours for Egypt time
+        displayDate = new Date(date.getTime() + 2 * 60 * 60 * 1000);
+      }
+
+      // Format with Egypt locale
+      return displayDate.toLocaleString("ar-EG", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error, dateString);
+      return "تاريخ غير صحيح";
+    }
+  };
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("ar-EG", {
       year: "numeric",
@@ -300,6 +311,34 @@ export default function HolidayManagerArabic() {
                               ) + 1}{" "}
                               يوم
                             </div>
+
+                            {/* Add user info display here */}
+                            {(holiday.modifiedBy ||
+                              holiday.lastModifiedDate) && (
+                              <div className="mt-3 pt-3 border-t border-gray-200 border-dashed">
+                                <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+                                  {holiday.modifiedBy && (
+                                    <div className="flex items-center gap-1">
+                                      <User className="w-3 h-3" />
+                                      <span>
+                                        أضيف بواسطة: {holiday.modifiedBy}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {holiday.lastModifiedDate && (
+                                    <div className="flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      <span>
+                                        التاريخ:{" "}
+                                        {formatDateTime(
+                                          holiday.lastModifiedDate
+                                        )}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                           <button
                             onClick={() => handleDeleteHoliday(holiday.id)}

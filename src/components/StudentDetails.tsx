@@ -21,16 +21,17 @@ import {
   Heart,
   DollarSign,
 } from "lucide-react";
-import { API_BASE } from "../lib/api";
+import { fetchAPI } from "../lib/api";
+import { resolvePhotoUrl } from "../utils/resolvePhotoUrl";
 
 // Helper functions for translations
 const translateReligion = (religion: number): string => {
   switch (religion) {
-    case 0:
-      return "مسلم";
     case 1:
-      return "مسيحي";
+      return "مسلم";
     case 2:
+      return "مسيحي";
+    case 3:
       return "أخرى";
     default:
       return "غير محدد";
@@ -105,40 +106,37 @@ export default function StudentDetails() {
   const loadStudent = async (studentId: string) => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
 
-      if (!token) {
-        toast.error("يرجى تسجيل الدخول أولاً");
-        navigate("/login");
-        return;
-      }
-
-      const response = await fetch(`${API_BASE}/api/Students/${studentId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+      // Use fetchAPI instead of direct fetch
+      const data = await fetchAPI(`/api/Students/${studentId}`);
+      console.log("Student data loaded:", {
+        studentId,
+        photoUrl: data.photoUrl,
+        resolvedPhotoUrl: resolvePhotoUrl(data.photoUrl),
       });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          toast.error("غير مصرح بالوصول");
-          navigate("/login");
-          return;
-        }
-        if (response.status === 404) {
-          toast.error("لم يتم العثور على الطالب");
-          navigate("/students");
-          return;
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
       setStudent(data);
     } catch (error: any) {
       console.error("Error loading student:", error);
       toast.error(error.message || "فشل تحميل بيانات الطالب");
+
+      // Handle specific error cases
+      if (
+        error.message?.includes("401") ||
+        error.message?.includes("غير مصرح")
+      ) {
+        toast.error("غير مصرح بالوصول");
+        navigate("/login");
+        return;
+      }
+
+      if (
+        error.message?.includes("404") ||
+        error.message?.includes("لم يتم العثور")
+      ) {
+        toast.error("لم يتم العثور على الطالب");
+        navigate("/students");
+        return;
+      }
     } finally {
       setLoading(false);
     }
@@ -201,11 +199,7 @@ export default function StudentDetails() {
             {student.photoUrl ? (
               <div className="relative">
                 <img
-                  src={
-                    student.photoUrl.startsWith("http")
-                      ? student.photoUrl
-                      : `${API_BASE}${student.photoUrl}`
-                  }
+                  src={resolvePhotoUrl(student.photoUrl)}
                   alt={`${student.firstName} ${student.lastName}`}
                   className="w-40 h-40 rounded-lg object-cover border-4 border-white shadow"
                   style={{
@@ -215,6 +209,7 @@ export default function StudentDetails() {
                     height: "160px",
                   }}
                   onError={(e) => {
+                    console.error("Image failed to load:", student.photoUrl);
                     (e.target as HTMLImageElement).src =
                       "https://via.placeholder.com/160x160/3B82F6/FFFFFF?text=صورة";
                   }}
