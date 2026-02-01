@@ -1,7 +1,46 @@
 // src/lib/api.ts
 import axios from "axios";
 
-export const API_BASE = "https://localhost:7152";
+// API Base URL Configuration
+// Priority: Runtime config > VITE_API_URL env var > default localhost
+// For Cloudflare Tunnel: Set VITE_API_URL in .env.local or .env.production
+const getApiBase = (): string => {
+  // Check for runtime configuration (set by deployment scripts or index.html)
+  // Only use if it's not empty
+  if (
+    typeof window !== "undefined" &&
+    (window as any).__API_CONFIG__?.baseUrl &&
+    (window as any).__API_CONFIG__.baseUrl.trim() !== ""
+  ) {
+    const url = (window as any).__API_CONFIG__.baseUrl
+      .replace(/\/$/, "")
+      .replace(/\/swagger$/, "");
+    console.log("🌐 Using runtime config API URL:", url);
+    return url;
+  }
+
+  // Check for Vite environment variable (for Cloudflare Tunnel URL)
+  // @ts-ignore - Vite injects this at build time
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && envUrl.trim() !== "") {
+    // Remove trailing slash and /swagger if present
+    const url = envUrl.replace(/\/$/, "").replace(/\/swagger$/, "");
+    console.log("🌐 Using VITE_API_URL:", url);
+    return url;
+  }
+
+  // Default to local development
+  console.log("🌐 Using default localhost API URL");
+  return "https://localhost:7152";
+};
+
+export const API_BASE = getApiBase();
+
+// Always log the API base URL for debugging
+console.log("══════════════════════════════════════════════");
+console.log("🌐 API Base URL:", API_BASE);
+console.log("🔧 Environment:", import.meta.env.MODE);
+console.log("══════════════════════════════════════════════");
 
 export interface UserInfo {
   userId: number;
@@ -35,7 +74,7 @@ export function saveUserInfo(loginResponse: any) {
   // Set initial selected dorm to primary location
   localStorage.setItem(
     "selectedDormId",
-    loginResponse.dormLocationId.toString()
+    loginResponse.dormLocationId.toString(),
   );
 }
 
@@ -67,7 +106,7 @@ export function getActiveDormLocationId(): number {
 
 export function setActiveDormLocationId(dormId: number) {
   localStorage.setItem("selectedDormId", dormId.toString());
-}// src/lib/api.ts
+} // src/lib/api.ts
 // src/lib/api.ts - UPDATED fetchAPI function
 // In your api.ts - Update fetchAPI function
 // In your api.ts - Update fetchAPI function
@@ -87,11 +126,11 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   };
 
   const selectedDormId = localStorage.getItem("selectedDormId");
-  
+
   if (selectedDormId && userInfo) {
     const dormIdNum = parseInt(selectedDormId);
     const canAccess = userInfo.accessibleDormLocationIds.includes(dormIdNum);
-    
+
     if (canAccess) {
       headers["X-Selected-Dorm-Id"] = selectedDormId;
     } else {
@@ -102,17 +141,23 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   }
 
   // Only set Content-Type if it's JSON and not FormData
-  if (!(options.body instanceof FormData) && 
-      !options.headers?.['Content-Type'] && 
-      options.method !== 'DELETE') { // Don't set Content-Type for DELETE
-    headers['Content-Type'] = 'application/json';
+  if (
+    !(options.body instanceof FormData) &&
+    !options.headers?.["Content-Type"] &&
+    options.method !== "DELETE"
+  ) {
+    // Don't set Content-Type for DELETE
+    headers["Content-Type"] = "application/json";
   }
 
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
       headers,
-      credentials: "include",
+      // Don't use credentials: "include" with Cloudflare tunnels
+      // It causes CORS issues. Use "same-origin" or "omit" instead
+      credentials: "omit",
+      mode: "cors",
     });
 
     console.log("📥 Response status:", response.status);

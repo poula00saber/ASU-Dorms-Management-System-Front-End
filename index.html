@@ -1,15 +1,24 @@
+﻿<!doctype html>
+<html lang="ar">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ASU Dorms Management System</title>
 
-  <!DOCTYPE html>
-  <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>ASU Dorms Management System UI</title>
-    </head>
+    <!-- Runtime API Configuration (optional - can be set at deployment) -->
+    <!-- This allows changing the API URL without rebuilding the app -->
+    <script>
+      window.__API_CONFIG__ = {
+        // Leave empty to use VITE_API_URL from build time
+        baseUrl: "",
+        version: "1.0.0",
+        environment: "development",
+      };
+    </script>
+  </head>
 
-    <body>
-      <div id="root"></div>
-      <script type="module" src="/src/main.tsx"></script>
-    </body>
-  </html>
-  
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

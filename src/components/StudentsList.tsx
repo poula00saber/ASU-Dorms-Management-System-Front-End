@@ -11,7 +11,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import { fetchAPI } from "../lib/api"; // Import fetchAPI
+import { fetchAPI, API_BASE } from "../lib/api"; // Import fetchAPI and API_BASE
 
 interface Student {
   id: string;
@@ -156,14 +156,11 @@ export default function StudentsList() {
         headers["X-Selected-Dorm-Id"] = selectedDormId;
       }
 
-      const response = await fetch(
-        `https://localhost:7152/api/Students/${id}`,
-        {
-          method: "DELETE",
-          headers,
-          credentials: "include",
-        }
-      );
+      const response = await fetch(`${API_BASE}/api/Students/${id}`, {
+        method: "DELETE",
+        headers,
+        credentials: "include",
+      });
 
       console.log("Delete status:", response.status);
 
@@ -176,7 +173,7 @@ export default function StudentsList() {
         try {
           const errorData = await response.json();
           throw new Error(
-            errorData.message || `HTTP error! status: ${response.status}`
+            errorData.message || `HTTP error! status: ${response.status}`,
           );
         } catch {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -215,7 +212,7 @@ export default function StudentsList() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedStudents = filteredStudents.slice(
     startIndex,
-    startIndex + itemsPerPage
+    startIndex + itemsPerPage,
   );
 
   // Reset page when filters/search change
