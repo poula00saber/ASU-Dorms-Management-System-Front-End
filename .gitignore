@@ -12,6 +12,9 @@ build/
 .env.local
 .env.*.local
 
+# Text files with sensitive URLs or dynamic content
+*.txt
+
 # IDE / Editor
 .vscode/*
 !.vscode/extensions.json

@@ -1,7 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Plus, Calendar, Trash2, Search, X, User,Clock } from "lucide-react";
+import {
+  Plus,
+  Calendar,
+  Trash2,
+  Search,
+  X,
+  User,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { fetchAPI } from "../lib/api"; // ✅ Import fetchAPI
-
 
 interface Student {
   studentId: string;
@@ -29,6 +38,10 @@ export default function HolidayManagerArabic() {
   const [studentHolidays, setStudentHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const [currentHolidayPage, setCurrentHolidayPage] = useState(1);
+  const holidaysPerPage = 5;
   const [formData, setFormData] = useState({
     startDate: "",
     endDate: "",
@@ -51,10 +64,31 @@ export default function HolidayManagerArabic() {
       (s) =>
         s.studentId.toLowerCase().includes(term) ||
         `${s.firstName} ${s.lastName}`.toLowerCase().includes(term) ||
-        s.nationalId.toLowerCase().includes(term)
+        s.nationalId.toLowerCase().includes(term),
     );
     setFilteredStudents(filtered);
   }, [searchTerm, students]);
+
+  // Reset page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedStudents = filteredStudents.slice(
+    startIndex,
+    startIndex + itemsPerPage,
+  );
+
+  // Holiday Pagination
+  const totalHolidayPages = Math.ceil(studentHolidays.length / holidaysPerPage);
+  const holidayStartIndex = (currentHolidayPage - 1) * holidaysPerPage;
+  const paginatedHolidays = studentHolidays.slice(
+    holidayStartIndex,
+    holidayStartIndex + holidaysPerPage,
+  );
 
   const fetchStudents = async () => {
     try {
@@ -82,6 +116,7 @@ export default function HolidayManagerArabic() {
 
   const handleSelectStudent = (student: Student) => {
     setSelectedStudent(student);
+    setCurrentHolidayPage(1);
     fetchStudentHolidays(student.studentId);
   };
 
@@ -206,8 +241,15 @@ export default function HolidayManagerArabic() {
               </div>
             </div>
 
+            {/* Results Count */}
+            <div className="px-6 py-2 text-sm text-gray-500 border-b border-gray-100">
+              عرض {filteredStudents.length > 0 ? startIndex + 1 : 0} إلى{" "}
+              {Math.min(startIndex + itemsPerPage, filteredStudents.length)} من{" "}
+              {filteredStudents.length} طالب
+            </div>
+
             {/* Students List */}
-            <div className="overflow-y-auto" style={{ maxHeight: "600px" }}>
+            <div className="overflow-y-auto" style={{ maxHeight: "480px" }}>
               {loading ? (
                 <div className="p-6 text-center text-gray-500">
                   جاري التحميل...
@@ -218,7 +260,7 @@ export default function HolidayManagerArabic() {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-200">
-                  {filteredStudents.map((student) => (
+                  {paginatedStudents.map((student) => (
                     <div
                       key={student.studentId}
                       onClick={() => handleSelectStudent(student)}
@@ -250,6 +292,59 @@ export default function HolidayManagerArabic() {
                 </div>
               )}
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                <button
+                  onClick={() =>
+                    setCurrentPage(Math.min(totalPages, currentPage + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 border rounded-lg disabled:opacity-50 flex items-center gap-1 text-sm"
+                >
+                  التالي <ChevronRight className="w-4 h-4" />
+                </button>
+
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.min(totalPages, 5) }).map(
+                    (_, i) => {
+                      let pageNum: number;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`w-8 h-8 rounded-lg text-sm ${
+                            currentPage === pageNum
+                              ? "bg-blue-600 text-white"
+                              : "hover:bg-gray-100"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    },
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 border rounded-lg disabled:opacity-50 flex items-center gap-1 text-sm"
+                >
+                  <ChevronLeft className="w-4 h-4" /> السابق
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Student Holidays Panel */}
@@ -287,70 +382,148 @@ export default function HolidayManagerArabic() {
                     لا توجد إجازات مسجلة لهذا الطالب
                   </div>
                 ) : (
-                  <div className="divide-y divide-gray-200">
-                    {studentHolidays.map((holiday) => (
-                      <div key={holiday.id} className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 text-gray-700 mb-2">
-                              <Calendar className="w-5 h-5 text-blue-600" />
-                              <span className="font-semibold">من:</span>
-                              <span>{formatDate(holiday.startDate)}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-gray-700">
-                              <Calendar className="w-5 h-5 text-red-600" />
-                              <span className="font-semibold">إلى:</span>
-                              <span>{formatDate(holiday.endDate)}</span>
-                            </div>
-                            <div className="mt-2 text-sm text-gray-600">
-                              المدة:{" "}
-                              {Math.ceil(
-                                (new Date(holiday.endDate).getTime() -
-                                  new Date(holiday.startDate).getTime()) /
-                                  (1000 * 60 * 60 * 24)
-                              ) + 1}{" "}
-                              يوم
-                            </div>
-
-                            {/* Add user info display here */}
-                            {(holiday.modifiedBy ||
-                              holiday.lastModifiedDate) && (
-                              <div className="mt-3 pt-3 border-t border-gray-200 border-dashed">
-                                <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
-                                  {holiday.modifiedBy && (
-                                    <div className="flex items-center gap-1">
-                                      <User className="w-3 h-3" />
-                                      <span>
-                                        أضيف بواسطة: {holiday.modifiedBy}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {holiday.lastModifiedDate && (
-                                    <div className="flex items-center gap-1">
-                                      <Clock className="w-3 h-3" />
-                                      <span>
-                                        التاريخ:{" "}
-                                        {formatDateTime(
-                                          holiday.lastModifiedDate
-                                        )}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
+                  <>
+                    {/* Results Count */}
+                    <div className="px-6 py-2 text-sm text-gray-500 border-b border-gray-100">
+                      عرض{" "}
+                      {studentHolidays.length > 0 ? holidayStartIndex + 1 : 0}{" "}
+                      إلى{" "}
+                      {Math.min(
+                        holidayStartIndex + holidaysPerPage,
+                        studentHolidays.length,
+                      )}{" "}
+                      من {studentHolidays.length} إجازة
+                    </div>
+                    <div className="divide-y divide-gray-200">
+                      {paginatedHolidays.map((holiday) => (
+                        <div key={holiday.id} className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 text-gray-700 mb-2">
+                                <Calendar className="w-5 h-5 text-blue-600" />
+                                <span className="font-semibold">من:</span>
+                                <span>{formatDate(holiday.startDate)}</span>
                               </div>
-                            )}
+                              <div className="flex items-center gap-2 text-gray-700">
+                                <Calendar className="w-5 h-5 text-red-600" />
+                                <span className="font-semibold">إلى:</span>
+                                <span>{formatDate(holiday.endDate)}</span>
+                              </div>
+                              <div className="mt-2 text-sm text-gray-600">
+                                المدة:{" "}
+                                {Math.ceil(
+                                  (new Date(holiday.endDate).getTime() -
+                                    new Date(holiday.startDate).getTime()) /
+                                    (1000 * 60 * 60 * 24),
+                                ) + 1}{" "}
+                                يوم
+                              </div>
+
+                              {/* Add user info display here */}
+                              {(holiday.modifiedBy ||
+                                holiday.lastModifiedDate) && (
+                                <div className="mt-3 pt-3 border-t border-gray-200 border-dashed">
+                                  <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+                                    {holiday.modifiedBy && (
+                                      <div className="flex items-center gap-1">
+                                        <User className="w-3 h-3" />
+                                        <span>
+                                          أضيف بواسطة: {holiday.modifiedBy}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {holiday.lastModifiedDate && (
+                                      <div className="flex items-center gap-1">
+                                        <Clock className="w-3 h-3" />
+                                        <span>
+                                          التاريخ:{" "}
+                                          {formatDateTime(
+                                            holiday.lastModifiedDate,
+                                          )}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => handleDeleteHoliday(holiday.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="حذف الإجازة"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
                           </div>
-                          <button
-                            onClick={() => handleDeleteHoliday(holiday.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="حذف الإجازة"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
                         </div>
+                      ))}
+                    </div>
+
+                    {/* Holiday Pagination */}
+                    {totalHolidayPages > 1 && (
+                      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                        <button
+                          onClick={() =>
+                            setCurrentHolidayPage(
+                              Math.min(
+                                totalHolidayPages,
+                                currentHolidayPage + 1,
+                              ),
+                            )
+                          }
+                          disabled={currentHolidayPage === totalHolidayPages}
+                          className="px-3 py-1.5 border rounded-lg disabled:opacity-50 flex items-center gap-1 text-sm"
+                        >
+                          التالي <ChevronRight className="w-4 h-4" />
+                        </button>
+
+                        <div className="flex gap-1">
+                          {Array.from({
+                            length: Math.min(totalHolidayPages, 5),
+                          }).map((_, i) => {
+                            let pageNum: number;
+                            if (totalHolidayPages <= 5) {
+                              pageNum = i + 1;
+                            } else if (currentHolidayPage <= 3) {
+                              pageNum = i + 1;
+                            } else if (
+                              currentHolidayPage >=
+                              totalHolidayPages - 2
+                            ) {
+                              pageNum = totalHolidayPages - 4 + i;
+                            } else {
+                              pageNum = currentHolidayPage - 2 + i;
+                            }
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => setCurrentHolidayPage(pageNum)}
+                                className={`w-8 h-8 rounded-lg text-sm ${
+                                  currentHolidayPage === pageNum
+                                    ? "bg-blue-600 text-white"
+                                    : "hover:bg-gray-100"
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <button
+                          onClick={() =>
+                            setCurrentHolidayPage(
+                              Math.max(1, currentHolidayPage - 1),
+                            )
+                          }
+                          disabled={currentHolidayPage === 1}
+                          className="px-3 py-1.5 border rounded-lg disabled:opacity-50 flex items-center gap-1 text-sm"
+                        >
+                          <ChevronLeft className="w-4 h-4" /> السابق
+                        </button>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -424,7 +597,7 @@ export default function HolidayManagerArabic() {
                     {Math.ceil(
                       (new Date(formData.endDate).getTime() -
                         new Date(formData.startDate).getTime()) /
-                        (1000 * 60 * 60 * 24)
+                        (1000 * 60 * 60 * 24),
                     ) + 1}{" "}
                     يوم
                   </p>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Printer, Users, CheckSquare, Loader2, Search } from "lucide-react";
+import { Printer, Users, CheckSquare, Loader2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import JsBarcode from "jsbarcode";
 import { toast } from "sonner";
 import { fetchAPI } from "../lib/api"; // Changed to fetchAPI
@@ -57,6 +57,8 @@ export default function StudentIdPrinter() {
   const [filterLevel, setFilterLevel] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
   const [selectedAll, setSelectedAll] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   // Fetch students from API - only for current user's dorm location
   const fetchStudents = async () => {
@@ -638,6 +640,16 @@ export default function StudentIdPrinter() {
     return matchesSearch && matchesFaculty && matchesBuilding && matchesLevel;
   });
 
+  // Pagination for table display (printing uses full filteredStudents)
+  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedStudents = filteredStudents.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterFaculty, filterBuilding, filterLevel]);
+
   if (loading && students.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -890,6 +902,11 @@ export default function StudentIdPrinter() {
           <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
             <Users className="w-5 h-5" />
             <span>قائمة الطلاب ({filteredStudents.length})</span>
+            {filteredStudents.length > 0 && (
+              <span className="text-gray-400">
+                - عرض {startIndex + 1} إلى {Math.min(startIndex + itemsPerPage, filteredStudents.length)}
+              </span>
+            )}
           </div>
           {selectedStudents.length > 0 && (
             <div className="text-sm text-blue-600 font-medium">
@@ -946,7 +963,7 @@ export default function StudentIdPrinter() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredStudents.map((student) => {
+                {paginatedStudents.map((student) => {
                   const studentName =
                     student.fullName ||
                     `${student.firstName} ${student.lastName}`;
@@ -993,6 +1010,55 @@ export default function StudentIdPrinter() {
             </table>
           )}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 border rounded-lg disabled:opacity-50 flex items-center gap-1 text-sm"
+            >
+              التالي <ChevronRight className="w-4 h-4" />
+            </button>
+
+            <div className="flex gap-1">
+              {Array.from({ length: Math.min(totalPages, 7) }).map((_, i) => {
+                let pageNum: number;
+                if (totalPages <= 7) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 4) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 3) {
+                  pageNum = totalPages - 6 + i;
+                } else {
+                  pageNum = currentPage - 3 + i;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`w-9 h-9 rounded-lg text-sm ${
+                      currentPage === pageNum
+                        ? "bg-blue-600 text-white"
+                        : "hover:bg-gray-100"
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-4 py-2 border rounded-lg disabled:opacity-50 flex items-center gap-1 text-sm"
+            >
+              <ChevronLeft className="w-4 h-4" /> السابق
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

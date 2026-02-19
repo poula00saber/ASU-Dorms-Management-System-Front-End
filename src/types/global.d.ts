@@ -11,16 +11,16 @@ declare module "vaul";
 declare module "react" {
   // minimal (and permissive) definitions to avoid build-time type errors if @types/react isn't installed
   export function useState<S = any>(
-    initialState: S | (() => S)
+    initialState: S | (() => S),
   ): [S, (s: S) => void];
   export function useEffect(
     effect: () => void | (() => void),
-    deps?: any[]
+    deps?: any[],
   ): void;
   export function useRef<T = any>(initial?: T): { current: T };
   export function useCallback<T extends (...args: any[]) => any>(
     cb: T,
-    deps?: any[]
+    deps?: any[],
   ): T;
   export function useMemo<T>(cb: () => T, deps?: any[]): T;
   export const Fragment: any;
@@ -60,4 +60,14 @@ declare module "react/jsx-runtime" {
   export function jsx(type: any, props?: any, key?: any): any;
   export function jsxs(type: any, props?: any, key?: any): any;
   export function jsxDEV(type: any, props?: any, key?: any): any;
+}
+// Pagination result type
+interface PagedResult<T> {
+  items: T[];
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
 }

@@ -12,6 +12,8 @@ import {
   Clock,
   Lock,
   Package,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { fetchAPI } from "../lib/api";
 
@@ -92,25 +94,25 @@ const getEgyptDate = () => {
   try {
     // Create date in Egypt timezone
     const now = new Date();
-    
+
     // Convert to Egypt timezone string
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Africa/Cairo',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Africa/Cairo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
     });
-    
+
     // Create date parts
     const parts = formatter.formatToParts(now);
-    const getPart = (type: string) => parts.find(p => p.type === type)?.value;
-    
-    const year = getPart('year') || '2026';
-    const month = getPart('month') || '01';
-    const day = getPart('day') || '21';
-    
+    const getPart = (type: string) => parts.find((p) => p.type === type)?.value;
+
+    const year = getPart("year") || "2026";
+    const month = getPart("month") || "01";
+    const day = getPart("day") || "21";
+
     // Return date-only for date inputs
     return `${year}-${month}-${day}`;
   } catch (error) {
@@ -125,7 +127,7 @@ export default function PaymentManagerArabic() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(
-    null
+    null,
   );
   const [paymentExemptions, setPaymentExemptions] = useState<
     PaymentExemption[]
@@ -136,6 +138,10 @@ export default function PaymentManagerArabic() {
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [exemptionSubmitting, setExemptionSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState({ username: "", role: "" });
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const [currentTransactionPage, setCurrentTransactionPage] = useState(1);
+  const transactionsPerPage = 5;
 
   const [paymentFormData, setPaymentFormData] = useState({
     amount: "",
@@ -180,10 +186,35 @@ export default function PaymentManagerArabic() {
       (s) =>
         s.studentId.toLowerCase().includes(term) ||
         `${s.firstName} ${s.lastName}`.toLowerCase().includes(term) ||
-        s.nationalId.toLowerCase().includes(term)
+        s.nationalId.toLowerCase().includes(term),
     );
     setFilteredStudents(filtered);
   }, [searchTerm, students]);
+
+  // Reset page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedStudents = filteredStudents.slice(
+    startIndex,
+    startIndex + itemsPerPage,
+  );
+
+  // Transaction Pagination
+  const recentTransactions = paymentSummary?.recentTransactions || [];
+  const totalTransactionPages = Math.ceil(
+    recentTransactions.length / transactionsPerPage,
+  );
+  const transactionStartIndex =
+    (currentTransactionPage - 1) * transactionsPerPage;
+  const paginatedTransactions = recentTransactions.slice(
+    transactionStartIndex,
+    transactionStartIndex + transactionsPerPage,
+  );
 
   const fetchStudents = async () => {
     try {
@@ -205,7 +236,7 @@ export default function PaymentManagerArabic() {
       // Fetch payment summary
       try {
         const summaryData = await fetchAPI(
-          `/api/PaymentTransactions/summary/${studentNationalId}`
+          `/api/PaymentTransactions/summary/${studentNationalId}`,
         );
         setPaymentSummary(summaryData);
       } catch (summaryError) {
@@ -216,7 +247,7 @@ export default function PaymentManagerArabic() {
       // Fetch payment exemptions
       try {
         const exemptionsData = await fetchAPI(
-          `/api/PaymentExemptions/student/${studentNationalId}`
+          `/api/PaymentExemptions/student/${studentNationalId}`,
         );
         setPaymentExemptions(exemptionsData || []);
       } catch (exemptionsError) {
@@ -232,6 +263,7 @@ export default function PaymentManagerArabic() {
 
   const handleSelectStudent = (student: Student) => {
     setSelectedStudent(student);
+    setCurrentTransactionPage(1);
     fetchStudentPayments(student.nationalId);
   };
 
@@ -413,14 +445,14 @@ export default function PaymentManagerArabic() {
 
   const handleToggleExemptionStatus = async (
     exemptionId: number,
-    isActive: boolean
+    isActive: boolean,
   ) => {
     const action = isActive ? "إلغاء تفعيل" : "تفعيل";
     if (!confirm(`هل أنت متأكد من ${action} هذا التصريح؟`)) return;
 
     try {
       console.log(
-        `Toggling exemption ${exemptionId} from ${isActive} to ${!isActive}`
+        `Toggling exemption ${exemptionId} from ${isActive} to ${!isActive}`,
       );
 
       const response = await fetchAPI(
@@ -431,7 +463,7 @@ export default function PaymentManagerArabic() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(!isActive), // Send the NEW status (opposite of current)
-        }
+        },
       );
 
       console.log(`Toggle response:`, response);
@@ -619,8 +651,15 @@ export default function PaymentManagerArabic() {
               </div>
             </div>
 
+            {/* Results Count */}
+            <div className="px-6 py-2 text-sm text-gray-500 border-b border-gray-100">
+              عرض {filteredStudents.length > 0 ? startIndex + 1 : 0} إلى{" "}
+              {Math.min(startIndex + itemsPerPage, filteredStudents.length)} من{" "}
+              {filteredStudents.length} طالب
+            </div>
+
             {/* Students List */}
-            <div className="overflow-y-auto" style={{ maxHeight: "600px" }}>
+            <div className="overflow-y-auto" style={{ maxHeight: "480px" }}>
               {loading ? (
                 <div className="p-6 text-center text-gray-500">
                   جاري التحميل...
@@ -631,7 +670,7 @@ export default function PaymentManagerArabic() {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-200">
-                  {filteredStudents.map((student) => (
+                  {paginatedStudents.map((student) => (
                     <div
                       key={student.studentId}
                       onClick={() => handleSelectStudent(student)}
@@ -682,6 +721,59 @@ export default function PaymentManagerArabic() {
                 </div>
               )}
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                <button
+                  onClick={() =>
+                    setCurrentPage(Math.min(totalPages, currentPage + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 border rounded-lg disabled:opacity-50 flex items-center gap-1 text-sm"
+                >
+                  التالي <ChevronRight className="w-4 h-4" />
+                </button>
+
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.min(totalPages, 5) }).map(
+                    (_, i) => {
+                      let pageNum: number;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`w-8 h-8 rounded-lg text-sm ${
+                            currentPage === pageNum
+                              ? "bg-blue-600 text-white"
+                              : "hover:bg-gray-100"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    },
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 border rounded-lg disabled:opacity-50 flex items-center gap-1 text-sm"
+                >
+                  <ChevronLeft className="w-4 h-4" /> السابق
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Student Payments Panel */}
@@ -781,66 +873,152 @@ export default function PaymentManagerArabic() {
                   <h3 className="font-bold text-gray-900 mb-3">
                     آخر المدفوعات
                   </h3>
-                  {paymentSummary?.recentTransactions?.length === 0 ? (
+                  {recentTransactions.length === 0 ? (
                     <p className="text-gray-500 text-center py-4">
                       لا توجد مدفوعات مسجلة
                     </p>
                   ) : (
-                    <div className="space-y-3">
-                      {paymentSummary?.recentTransactions?.map((payment) => (
-                        <div
-                          key={payment.id}
-                          className="p-3 bg-gray-50 rounded-lg"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                {getPaymentTypeIcon(payment.paymentType)}
-                                <span
-                                  className={`font-semibold ${getPaymentTypeColor(
-                                    payment.paymentType
-                                  )}`}
-                                >
-                                  {payment.paymentTypeDisplay}
-                                </span>
-                                <span className="text-gray-900 font-bold">
-                                  {formatCurrency(payment.amount)}
-                                </span>
-                              </div>
-                              <div className="text-sm text-gray-600 space-y-1">
-                                <p>
-                                  التاريخ: {formatDate(payment.paymentDate)}
-                                </p>
-                                {payment.receiptNumber && (
-                                  <p>رقم الإيصال: {payment.receiptNumber}</p>
-                                )}
-                                {payment.month && payment.year && (
+                    <>
+                      {/* Results Count */}
+                      <div className="text-sm text-gray-500 border-b border-gray-100 pb-2 mb-3">
+                        عرض{" "}
+                        {recentTransactions.length > 0
+                          ? transactionStartIndex + 1
+                          : 0}{" "}
+                        إلى{" "}
+                        {Math.min(
+                          transactionStartIndex + transactionsPerPage,
+                          recentTransactions.length,
+                        )}{" "}
+                        من {recentTransactions.length} دفعة
+                      </div>
+                      <div className="space-y-3">
+                        {paginatedTransactions.map((payment) => (
+                          <div
+                            key={payment.id}
+                            className="p-3 bg-gray-50 rounded-lg"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  {getPaymentTypeIcon(payment.paymentType)}
+                                  <span
+                                    className={`font-semibold ${getPaymentTypeColor(
+                                      payment.paymentType,
+                                    )}`}
+                                  >
+                                    {payment.paymentTypeDisplay}
+                                  </span>
+                                  <span className="text-gray-900 font-bold">
+                                    {formatCurrency(payment.amount)}
+                                  </span>
+                                </div>
+                                <div className="text-sm text-gray-600 space-y-1">
                                   <p>
-                                    الشهر: {payment.month}/{payment.year}
+                                    التاريخ: {formatDate(payment.paymentDate)}
                                   </p>
-                                )}
-                                {payment.missedMealsCount && (
-                                  <p>عدد الوجبات: {payment.missedMealsCount}</p>
-                                )}
+                                  {payment.receiptNumber && (
+                                    <p>رقم الإيصال: {payment.receiptNumber}</p>
+                                  )}
+                                  {payment.month && payment.year && (
+                                    <p>
+                                      الشهر: {payment.month}/{payment.year}
+                                    </p>
+                                  )}
+                                  {payment.missedMealsCount && (
+                                    <p>
+                                      عدد الوجبات: {payment.missedMealsCount}
+                                    </p>
+                                  )}
+                                </div>
+                                {/* Display modifiedBy and timestamp */}
+                                <UserInfoDisplay
+                                  modifiedBy={payment.modifiedBy}
+                                  createdAt={payment.createdAt}
+                                  type="payment"
+                                />
                               </div>
-                              {/* Display modifiedBy and timestamp */}
-                              <UserInfoDisplay
-                                modifiedBy={payment.modifiedBy}
-                                createdAt={payment.createdAt}
-                                type="payment"
-                              />
+                              <button
+                                onClick={() => handleDeletePayment(payment.id)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="حذف الدفعة"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </button>
                             </div>
-                            <button
-                              onClick={() => handleDeletePayment(payment.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="حذف الدفعة"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
                           </div>
+                        ))}
+                      </div>
+
+                      {/* Transaction Pagination */}
+                      {totalTransactionPages > 1 && (
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200">
+                          <button
+                            onClick={() =>
+                              setCurrentTransactionPage(
+                                Math.min(
+                                  totalTransactionPages,
+                                  currentTransactionPage + 1,
+                                ),
+                              )
+                            }
+                            disabled={
+                              currentTransactionPage === totalTransactionPages
+                            }
+                            className="px-3 py-1 border rounded-lg disabled:opacity-50 flex items-center gap-1 text-sm"
+                          >
+                            التالي <ChevronRight className="w-4 h-4" />
+                          </button>
+
+                          <div className="flex gap-1">
+                            {Array.from({
+                              length: Math.min(totalTransactionPages, 5),
+                            }).map((_, i) => {
+                              let pageNum: number;
+                              if (totalTransactionPages <= 5) {
+                                pageNum = i + 1;
+                              } else if (currentTransactionPage <= 3) {
+                                pageNum = i + 1;
+                              } else if (
+                                currentTransactionPage >=
+                                totalTransactionPages - 2
+                              ) {
+                                pageNum = totalTransactionPages - 4 + i;
+                              } else {
+                                pageNum = currentTransactionPage - 2 + i;
+                              }
+                              return (
+                                <button
+                                  key={pageNum}
+                                  onClick={() =>
+                                    setCurrentTransactionPage(pageNum)
+                                  }
+                                  className={`w-8 h-8 rounded-lg text-sm ${
+                                    currentTransactionPage === pageNum
+                                      ? "bg-blue-600 text-white"
+                                      : "hover:bg-gray-100"
+                                  }`}
+                                >
+                                  {pageNum}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <button
+                            onClick={() =>
+                              setCurrentTransactionPage(
+                                Math.max(1, currentTransactionPage - 1),
+                              )
+                            }
+                            disabled={currentTransactionPage === 1}
+                            className="px-3 py-1 border rounded-lg disabled:opacity-50 flex items-center gap-1 text-sm"
+                          >
+                            <ChevronLeft className="w-4 h-4" /> السابق
+                          </button>
                         </div>
-                      ))}
-                    </div>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -918,7 +1096,7 @@ export default function PaymentManagerArabic() {
                                 onClick={() =>
                                   handleToggleExemptionStatus(
                                     exemption.id,
-                                    exemption.isActive
+                                    exemption.isActive,
                                   )
                                 }
                                 className={`p-2 rounded-lg transition-colors ${
@@ -1087,7 +1265,7 @@ export default function PaymentManagerArabic() {
                               <option key={month} value={month}>
                                 {month}
                               </option>
-                            )
+                            ),
                           )}
                         </select>
                       </div>
@@ -1292,7 +1470,7 @@ export default function PaymentManagerArabic() {
                         {Math.ceil(
                           (new Date(exemptionFormData.endDate).getTime() -
                             new Date(exemptionFormData.startDate).getTime()) /
-                            (1000 * 60 * 60 * 24)
+                            (1000 * 60 * 60 * 24),
                         ) + 1}{" "}
                         يوم
                       </p>
