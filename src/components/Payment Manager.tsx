@@ -135,14 +135,23 @@ export default function PaymentManagerArabic() {
   const [loading, setLoading] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showExemptionModal, setShowExemptionModal] = useState(false);
+  const [showBulkFeesModal, setShowBulkFeesModal] = useState(false);
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [exemptionSubmitting, setExemptionSubmitting] = useState(false);
+  const [bulkFeesSubmitting, setBulkFeesSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState({ username: "", role: "" });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [currentTransactionPage, setCurrentTransactionPage] = useState(1);
   const transactionsPerPage = 5;
 
+  // Bulk Fees States
+  const [bulkFeesMonth, setBulkFeesMonth] = useState("");
+  const [bulkFeesDormTypes, setBulkFeesDormTypes] = useState<any[]>([]);
+  const [bulkFeesAmounts, setBulkFeesAmounts] = useState<{
+    [key: number]: string;
+  }>({});
+  const [bulkFeesDescription, setBulkFeesDescription] = useState("");
   const [paymentFormData, setPaymentFormData] = useState({
     amount: "",
     paymentType: "MonthlyFee" as
@@ -482,6 +491,95 @@ export default function PaymentManagerArabic() {
     }
   };
 
+  // Bulk Monthly Fees Functions
+  const fetchAvailableDormTypes = async () => {
+    try {
+      const data = await fetchAPI(
+        "/api/PaymentTransactions/bulk/available-dorm-types",
+      );
+      setBulkFeesDormTypes(data || []);
+      // Initialize amounts object
+      const amounts: { [key: number]: string } = {};
+      (data || []).forEach((dorm: any) => {
+        amounts[dorm.dormTypeId] = "";
+      });
+      setBulkFeesAmounts(amounts);
+    } catch (err: any) {
+      console.error("Error fetching dorm types:", err);
+      alert(err.message || "حدث خطأ أثناء تحميل أنواع المباني");
+    }
+  };
+
+  const handleBulkFeesOpen = async () => {
+    setShowBulkFeesModal(true);
+    // Get today's date in YYYY-MM format
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    setBulkFeesMonth(`${year}-${month}`);
+    await fetchAvailableDormTypes();
+  };
+
+  const handleBulkFeesSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!bulkFeesMonth) {
+      alert("يرجى اختيار الشهر");
+      return;
+    }
+
+    // Check if all amounts are filled
+    const allFilled = Object.values(bulkFeesAmounts).every(
+      (val) => val.trim() !== "",
+    );
+    if (!allFilled) {
+      alert("يرجى ملء جميع المبالغ");
+      return;
+    }
+
+    try {
+      setBulkFeesSubmitting(true);
+
+      // Convert amounts to numbers
+      const dormTypeAmounts: { [key: number]: number } = {};
+      Object.entries(bulkFeesAmounts).forEach(([dormId, amount]) => {
+        dormTypeAmounts[parseInt(dormId)] = parseFloat(amount);
+      });
+
+      const payload = {
+        dormTypeAmounts,
+        month: bulkFeesMonth,
+        description:
+          bulkFeesDescription || `رسوم شهرية بتاريخ ${bulkFeesMonth}`,
+      };
+
+      const result = await fetchAPI(
+        "/api/PaymentTransactions/bulk/add-monthly-fees",
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        },
+      );
+
+      alert(
+        `تم إضافة الرسوم بنجاح!\n\n` +
+          `عدد الطلاب المعالجين: ${result.totalStudentsProcessed}\n` +
+          `الإجمالي المضاف: ${formatCurrency(result.totalAmountAdded)}`,
+      );
+
+      // Reset and close modal
+      setShowBulkFeesModal(false);
+      setBulkFeesMonth("");
+      setBulkFeesAmounts({});
+      setBulkFeesDescription("");
+    } catch (err: any) {
+      console.error("Error submitting bulk fees:", err);
+      alert(err.message || "حدث خطأ أثناء إضافة الرسوم");
+    } finally {
+      setBulkFeesSubmitting(false);
+    }
+  };
+
   // Format date and time for display using Egypt time zone
   // Format date and time for display using Egypt time zone - IMPROVED VERSION
   const formatDateTime = (dateString: string) => {
@@ -609,7 +707,7 @@ export default function PaymentManagerArabic() {
       <div className="max-w-7xl mx-auto">
         {/* Header with current user info */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center flex-wrap gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 إدارة المدفوعات والتصاريح
@@ -618,15 +716,27 @@ export default function PaymentManagerArabic() {
                 إدارة مدفوعات وتصاريح الطلاب في السكن الجامعي
               </p>
             </div>
-            {currentUser.username && (
-              <div className="bg-blue-50 px-4 py-2 rounded-lg">
-                <p className="text-blue-700 font-semibold">
-                  <User className="w-4 h-4 inline-block ml-1" />
-                  {currentUser.username}
-                </p>
-                <p className="text-blue-600 text-sm">{currentUser.role}</p>
-              </div>
-            )}
+            <div className="flex items-center gap-4">
+              {/* Bulk Fees Button - Only for Registration Users */}
+              {currentUser.role === "Registration" && (
+                <button
+                  onClick={handleBulkFeesOpen}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center gap-2 whitespace-nowrap"
+                >
+                  <Plus className="w-5 h-5" />
+                  إضافة رسوم شهرية
+                </button>
+              )}
+              {currentUser.username && (
+                <div className="bg-blue-50 px-4 py-2 rounded-lg">
+                  <p className="text-blue-700 font-semibold">
+                    <User className="w-4 h-4 inline-block ml-1" />
+                    {currentUser.username}
+                  </p>
+                  <p className="text-blue-600 text-sm">{currentUser.role}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1498,6 +1608,174 @@ export default function PaymentManagerArabic() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Monthly Fees Modal */}
+      {showBulkFeesModal && (
+        <div className="fixed inset-0 bg-black/50 overflow-y-auto z-50">
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-md w-full" dir="rtl">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 shrink-0">
+                <h2 className="text-xl font-bold text-gray-900">
+                  إضافة رسوم شهرية للطلاب
+                </h2>
+                <button
+                  onClick={() => setShowBulkFeesModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded transition-colors"
+                >
+                  <X className="w-6 h-6 text-gray-600" />
+                </button>
+              </div>
+
+              <form
+                onSubmit={handleBulkFeesSubmit}
+                className="p-6 space-y-6 max-h-96 overflow-y-auto"
+              >
+                {/* Month Selector */}
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">
+                    اختر الشهر *
+                  </label>
+                  <input
+                    type="month"
+                    value={bulkFeesMonth}
+                    onChange={(e) => setBulkFeesMonth(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                {/* Dorm Types */}
+                {bulkFeesDormTypes.length > 0 ? (
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-4">
+                      إدخل المبلغ لكل نوع مبنى *
+                    </label>
+                    <div className="space-y-3">
+                      {bulkFeesDormTypes.map((dorm) => (
+                        <div
+                          key={dorm.dormTypeId}
+                          className="p-4 bg-gray-50 rounded-lg border border-gray-200"
+                        >
+                          <div className="flex justify-between items-center mb-2">
+                            <label className="font-semibold text-gray-700">
+                              {dorm.dormTypeName}
+                            </label>
+                            <span className="text-sm text-gray-500">
+                              {dorm.studentCount} طالب
+                            </span>
+                          </div>
+                          <input
+                            type="number"
+                            placeholder="أدخل المبلغ"
+                            value={bulkFeesAmounts[dorm.dormTypeId] || ""}
+                            onChange={(e) =>
+                              setBulkFeesAmounts({
+                                ...bulkFeesAmounts,
+                                [dorm.dormTypeId]: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            required
+                            min="0"
+                            step="0.01"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <p className="text-yellow-700">
+                      جاري تحميل أنواع المباني...
+                    </p>
+                  </div>
+                )}
+
+                {/* Description (Optional) */}
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">
+                    وصف (اختياري)
+                  </label>
+                  <textarea
+                    value={bulkFeesDescription}
+                    onChange={(e) => setBulkFeesDescription(e.target.value)}
+                    placeholder="أضف وصف للعملية"
+                    rows={2}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Summary */}
+                {Object.values(bulkFeesAmounts).some(
+                  (val) => val.trim() !== "",
+                ) && (
+                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                    <p className="text-green-700 font-semibold mb-2">
+                      ملخص الرسوم:
+                    </p>
+                    <div className="space-y-1">
+                      {bulkFeesDormTypes.map((dorm) => {
+                        const amount = bulkFeesAmounts[dorm.dormTypeId];
+                        if (!amount || amount === "") return null;
+                        const totalForDorm =
+                          parseFloat(amount) * dorm.studentCount;
+                        return (
+                          <div key={dorm.dormTypeId} className="text-sm">
+                            <span className="text-green-600">
+                              {dorm.dormTypeName}:{" "}
+                              {formatCurrency(parseFloat(amount))} ×{" "}
+                              {dorm.studentCount} ={" "}
+                              {formatCurrency(totalForDorm)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      <div className="border-t border-green-200 pt-2 mt-2 font-semibold text-green-700">
+                        الإجمالي:{" "}
+                        {formatCurrency(
+                          bulkFeesDormTypes.reduce((total, dorm) => {
+                            const amount = bulkFeesAmounts[dorm.dormTypeId];
+                            return (
+                              total +
+                              (amount && amount !== ""
+                                ? parseFloat(amount) * dorm.studentCount
+                                : 0)
+                            );
+                          }, 0),
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Buttons */}
+                <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setShowBulkFeesModal(false)}
+                    className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={
+                      bulkFeesSubmitting ||
+                      bulkFeesDormTypes.length === 0 ||
+                      !Object.values(bulkFeesAmounts).some(
+                        (val) => val.trim() !== "",
+                      )
+                    }
+                    className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {bulkFeesSubmitting ? "جاري الإضافة..." : "إضافة الرسوم"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
