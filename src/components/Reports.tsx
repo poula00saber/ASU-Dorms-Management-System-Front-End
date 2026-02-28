@@ -127,7 +127,7 @@ function DailyReport({
 
       // Use fetchAPI instead of direct fetch
       const data = await fetchAPI(
-        `/api/Reports/daily-absence?date=${selectedDate}`
+        `/api/Reports/daily-absence?date=${selectedDate}&includeAllStudents=true&excludeHolidayOnly=true`
       );
       setReportData(data);
     } catch (err: any) {
@@ -161,6 +161,7 @@ function DailyReport({
           "إفطار/عشاء": s.missedBreakfastDinner ? "غائب" : "حاضر",
           الغداء: s.missedLunch ? "غائب" : "حاضر",
           "إجمالي الوجبات": s.totalMissedMealsToday,
+          "المبلغ المستحق": s.outstandingAmount || 0,
         });
       });
     });
@@ -260,6 +261,7 @@ function DailyReport({
                       <Th center>إفطار/عشاء</Th>
                       <Th center>الغداء</Th>
                       <Th center>إجمالي الوجبات الفائتة</Th>
+                      <Th center>المبلغ المستحق</Th>
                     </tr>
                   </thead>
 
@@ -288,6 +290,16 @@ function DailyReport({
                           <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full font-semibold">
                             {s.totalMissedMealsToday}
                           </span>
+                        </Td>
+
+                        <Td center>
+                          {(s.outstandingAmount || 0) > 0 ? (
+                            <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full font-semibold">
+                              {(s.outstandingAmount || 0).toFixed(2)} جنيه
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">0</span>
+                          )}
                         </Td>
                       </tr>
                     ))}
@@ -331,7 +343,7 @@ function MonthlyReport({
         toDate: dateTo,
       });
 
-      const data = await fetchAPI(`/api/Reports/monthly-absence?${params}`);
+      const data = await fetchAPI(`/api/Reports/monthly-absence?${params}&includeAllStudents=true`);
       setReportData(data);
     } catch (err: any) {
       toast.error(err.message || "حدث خطأ أثناء تحميل التقرير");
@@ -365,6 +377,7 @@ function MonthlyReport({
           "إجمالي الوجبات": s.totalMissedMeals,
           "أيام الإجازة": s.daysOnHoliday,
           الغرامة: s.totalPenalty,
+          "المبلغ المستحق": s.outstandingAmount || 0,
         });
       });
     });
@@ -474,6 +487,7 @@ function MonthlyReport({
                       <Th center>إجمالي الوجبات</Th>
                       <Th center>أيام الإجازة</Th>
                       <Th center>الغرامة المتوقعة</Th>
+                      <Th center>المبلغ المستحق</Th>
                     </tr>
                   </thead>
 
@@ -500,6 +514,16 @@ function MonthlyReport({
 
                         <Td center>{s.daysOnHoliday}</Td>
                         <Td center>{s.totalPenalty.toFixed(2)} جنيه</Td>
+
+                        <Td center>
+                          {(s.outstandingAmount || 0) > 0 ? (
+                            <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full font-semibold">
+                              {(s.outstandingAmount || 0).toFixed(2)} جنيه
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">0</span>
+                          )}
+                        </Td>
                       </tr>
                     ))}
                   </tbody>

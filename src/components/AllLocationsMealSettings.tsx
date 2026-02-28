@@ -11,7 +11,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
-import { fetchAPI } from "../lib/api"; // ✅ Changed to fetchAPI
+import { fetchAPI, getUserInfo } from "../lib/api";
 
 interface DormLocationSetting {
   id: number;
@@ -23,7 +23,15 @@ interface DormLocationSetting {
   lunchStartTime?: string;
   lunchEndTime?: string;
   missedMealFeeAmount?: number;
+  monthlyFees?: Record<number, number>; // { dormTypeId: feeAmount }
 }
+
+// Dorm type ID → Arabic label mapping
+const dormTypeLabels: Record<number, string> = {
+  1: "عادي",
+  2: "مميز",
+  3: "فندقي",
+};
 
 // Visual Time Picker Component
 interface TimePickerProps {
@@ -200,6 +208,17 @@ export default function AllLocationsMealSettings() {
     missedMealFeeAmount: 0,
   });
 
+  // Monthly fee editing state
+  const [editingFeesLocationId, setEditingFeesLocationId] = useState<number | null>(null);
+  const [feesForm, setFeesForm] = useState<Record<number, number>>({});
+  const [savingFees, setSavingFees] = useState(false);
+  const [applyFeesToAll, setApplyFeesToAll] = useState(false);
+  const [applySettingsToAll, setApplySettingsToAll] = useState(false);
+
+  // Accessible dorm location IDs for the current user
+  const userInfo = getUserInfo();
+  const accessibleDormIds = userInfo?.accessibleDormLocationIds || [];
+
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -252,6 +271,7 @@ export default function AllLocationsMealSettings() {
 
   const handleEditLocation = (location: DormLocationSetting) => {
     setEditingLocationId(location.id);
+    setApplySettingsToAll(false);
     setEditForm({
       breakfastDinnerStartTime:
         formatTimeForInput(location.breakfastDinnerStartTime) || "17:00",
@@ -261,6 +281,60 @@ export default function AllLocationsMealSettings() {
       lunchEndTime: formatTimeForInput(location.lunchEndTime) || "21:00",
       missedMealFeeAmount: location.missedMealFeeAmount || 0,
     });
+  };
+
+  // Monthly fees handlers
+  const handleEditFees = (location: DormLocationSetting) => {
+    setEditingFeesLocationId(location.id);
+    setFeesForm({ ...(location.monthlyFees || {}) });
+    setApplyFeesToAll(false);
+  };
+
+  const handleSaveMonthlyFees = async (locationId: number) => {
+    try {
+      setSavingFees(true);
+
+      // Save for the current location
+      await fetchAPI("/api/Meals/monthly-fees", {
+        method: "PUT",
+        body: JSON.stringify({
+          dormLocationId: locationId,
+          monthlyFees: feesForm,
+        }),
+      });
+
+      // If checkbox is checked, also apply to all other accessible dorms
+      if (applyFeesToAll && accessibleDormIds.length > 1) {
+        const targetIds = accessibleDormIds.filter((id) => id !== locationId);
+        for (const targetId of targetIds) {
+          await fetchAPI("/api/Meals/monthly-fees", {
+            method: "PUT",
+            body: JSON.stringify({
+              dormLocationId: targetId,
+              monthlyFees: feesForm,
+            }),
+          });
+        }
+        await fetchSettings();
+        toast.success(`تم حفظ الرسوم الشهرية وتطبيقها على ${targetIds.length + 1} موقع بنجاح`);
+      } else {
+        setLocations((prev) =>
+          prev.map((loc) =>
+            loc.id === locationId
+              ? { ...loc, monthlyFees: { ...feesForm } }
+              : loc,
+          ),
+        );
+        toast.success("تم حفظ الرسوم الشهرية بنجاح");
+      }
+
+      setEditingFeesLocationId(null);
+      setApplyFeesToAll(false);
+    } catch (err: any) {
+      toast.error(err.message || "حدث خطأ أثناء حفظ الرسوم الشهرية");
+    } finally {
+      setSavingFees(false);
+    }
   };
 
   const formatTimeForInput = (time?: string): string => {
@@ -289,41 +363,58 @@ export default function AllLocationsMealSettings() {
   const handleSaveLocationSettings = async (locationId: number) => {
     try {
       setSaving(true);
+      const settingsPayload = {
+        allowCombinedMealScan:
+          locations.find((l) => l.id === locationId)?.allowCombinedMealScan ||
+          false,
+        breakfastDinnerStartTime: editForm.breakfastDinnerStartTime,
+        breakfastDinnerEndTime: editForm.breakfastDinnerEndTime,
+        lunchStartTime: editForm.lunchStartTime,
+        lunchEndTime: editForm.lunchEndTime,
+        missedMealFeeAmount: editForm.missedMealFeeAmount,
+      };
+
       await fetchAPI("/api/Meals/settings", {
         method: "PUT",
         headers: {
           "X-Selected-Dorm-Id": locationId.toString(),
         },
-        body: JSON.stringify({
-          allowCombinedMealScan:
-            locations.find((l) => l.id === locationId)?.allowCombinedMealScan ||
-            false,
-          breakfastDinnerStartTime: editForm.breakfastDinnerStartTime,
-          breakfastDinnerEndTime: editForm.breakfastDinnerEndTime,
-          lunchStartTime: editForm.lunchStartTime,
-          lunchEndTime: editForm.lunchEndTime,
-          missedMealFeeAmount: editForm.missedMealFeeAmount,
-        }),
+        body: JSON.stringify(settingsPayload),
       });
 
-      // Update local state
-      setLocations((prev) =>
-        prev.map((loc) =>
-          loc.id === locationId
-            ? {
-                ...loc,
-                breakfastDinnerStartTime: editForm.breakfastDinnerStartTime,
-                breakfastDinnerEndTime: editForm.breakfastDinnerEndTime,
-                lunchStartTime: editForm.lunchStartTime,
-                lunchEndTime: editForm.lunchEndTime,
-                missedMealFeeAmount: editForm.missedMealFeeAmount,
-              }
-            : loc,
-        ),
-      );
+      // If checkbox is checked, also apply to all other accessible dorms
+      if (applySettingsToAll && accessibleDormIds.length > 1) {
+        const targetIds = accessibleDormIds.filter((id) => id !== locationId);
+        for (const targetId of targetIds) {
+          await fetchAPI("/api/Meals/settings", {
+            method: "PUT",
+            headers: { "X-Selected-Dorm-Id": targetId.toString() },
+            body: JSON.stringify(settingsPayload),
+          });
+        }
+        await fetchSettings();
+        toast.success(`تم حفظ الإعدادات وتطبيقها على ${targetIds.length + 1} موقع بنجاح`);
+      } else {
+        // Update local state
+        setLocations((prev) =>
+          prev.map((loc) =>
+            loc.id === locationId
+              ? {
+                  ...loc,
+                  breakfastDinnerStartTime: editForm.breakfastDinnerStartTime,
+                  breakfastDinnerEndTime: editForm.breakfastDinnerEndTime,
+                  lunchStartTime: editForm.lunchStartTime,
+                  lunchEndTime: editForm.lunchEndTime,
+                  missedMealFeeAmount: editForm.missedMealFeeAmount,
+                }
+              : loc,
+          ),
+        );
+        toast.success("تم حفظ إعدادات الموقع بنجاح");
+      }
 
-      toast.success("تم حفظ إعدادات الموقع بنجاح");
       setEditingLocationId(null);
+      setApplySettingsToAll(false);
     } catch (err: any) {
       toast.error(err.message || "حدث خطأ أثناء حفظ الإعدادات");
     } finally {
@@ -370,7 +461,11 @@ export default function AllLocationsMealSettings() {
     );
   }
 
-  const activeLocations = locations.filter((l) => l.isActive);
+  // Filter locations to only those accessible to the user (show all if no restriction)
+  const visibleLocations = accessibleDormIds.length > 0
+    ? locations.filter((l) => accessibleDormIds.includes(l.id))
+    : locations;
+  const activeLocations = visibleLocations.filter((l) => l.isActive);
   const enabledCount = activeLocations.filter(
     (l) => l.allowCombinedMealScan,
   ).length;
@@ -474,7 +569,7 @@ export default function AllLocationsMealSettings() {
 
       {/* Locations Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {locations.map((location) => (
+        {visibleLocations.map((location) => (
           <div
             key={location.id}
             className={`bg-white rounded-lg shadow-lg border-2 transition-all ${
@@ -576,6 +671,84 @@ export default function AllLocationsMealSettings() {
                     <span>{location.missedMealFeeAmount || 0} جنيه</span>
                   </div>
                 </div>
+
+                {/* Monthly Fees Display */}
+                <div className="bg-purple-50 rounded-lg p-3">
+                  <p className="text-xs text-purple-900 font-semibold mb-2">الرسوم الشهرية:</p>
+                  <div className="grid grid-cols-3 gap-2 text-xs text-purple-800">
+                    {Object.entries(location.monthlyFees || {}).map(([typeId, amount]) => (
+                      <div key={typeId} className="text-center">
+                        <span className="block font-semibold">{dormTypeLabels[Number(typeId)] || `نوع ${typeId}`}</span>
+                        <span>{amount} جنيه</span>
+                      </div>
+                    ))}
+                    {Object.keys(location.monthlyFees || {}).length === 0 && (
+                      <div className="col-span-3 text-center text-gray-500">لا توجد رسوم محددة</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Monthly Fees Editing */}
+                {location.isActive && editingFeesLocationId === location.id && (
+                  <div className="bg-purple-50 rounded-lg p-4 space-y-3 border border-purple-200">
+                    <h4 className="font-bold text-purple-900 text-sm">تعديل الرسوم الشهرية</h4>
+                    <div className="space-y-2">
+                      {Object.entries(feesForm).map(([typeId, amount]) => (
+                        <div key={typeId} className="flex items-center gap-2">
+                          <label className="text-xs text-gray-600 w-16 shrink-0">{dormTypeLabels[Number(typeId)] || `نوع ${typeId}`}</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={amount}
+                            onChange={(e) => setFeesForm({ ...feesForm, [typeId]: parseFloat(e.target.value) || 0 })}
+                            className="flex-1 px-2 py-1.5 border rounded text-sm"
+                          />
+                          <span className="text-xs text-gray-500">جنيه</span>
+                        </div>
+                      ))}
+                      {/* Add new dorm type fee */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const existingIds = Object.keys(feesForm).map(Number);
+                          const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+                          setFeesForm({ ...feesForm, [nextId]: 0 });
+                        }}
+                        className="w-full px-2 py-1.5 border border-dashed border-purple-300 text-purple-600 rounded text-xs hover:bg-purple-50 transition-colors"
+                      >
+                        + إضافة نوع سكن جديد
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setEditingFeesLocationId(null)}
+                        className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50"
+                      >
+                        إلغاء
+                      </button>
+                      <button
+                        onClick={() => handleSaveMonthlyFees(location.id)}
+                        disabled={savingFees}
+                        className="flex-1 px-3 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-1"
+                      >
+                        <Save className="w-3 h-3" />
+                        {savingFees ? "جاري الحفظ..." : "حفظ الرسوم"}
+                      </button>
+                    </div>
+                    {accessibleDormIds.length > 1 && (
+                      <label className="flex items-center gap-2 text-xs text-purple-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={applyFeesToAll}
+                          onChange={(e) => setApplyFeesToAll(e.target.checked)}
+                          className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        تطبيق الرسوم على جميع المواقع المتاحة ({accessibleDormIds.length - 1} موقع آخر)
+                      </label>
+                    )}
+                  </div>
+                )}
 
                 {/* Edit Settings Button */}
                 {location.isActive && (
@@ -691,15 +864,37 @@ export default function AllLocationsMealSettings() {
                             {saving ? "جاري الحفظ..." : "حفظ"}
                           </button>
                         </div>
+                        {accessibleDormIds.length > 1 && (
+                          <label className="flex items-center gap-2 text-xs text-blue-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={applySettingsToAll}
+                              onChange={(e) => setApplySettingsToAll(e.target.checked)}
+                              className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            تطبيق الإعدادات على جميع المواقع المتاحة ({accessibleDormIds.length - 1} موقع آخر)
+                          </label>
+                        )}
                       </div>
                     ) : (
-                      <button
-                        onClick={() => handleEditLocation(location)}
-                        className="w-full px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm hover:bg-blue-100 transition-colors font-semibold flex items-center justify-center gap-1"
-                      >
-                        <Settings className="w-4 h-4" />
-                        تعديل الإعدادات
-                      </button>
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => handleEditLocation(location)}
+                          className="w-full px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm hover:bg-blue-100 transition-colors font-semibold flex items-center justify-center gap-1"
+                        >
+                          <Settings className="w-4 h-4" />
+                          تعديل الإعدادات
+                        </button>
+                        {editingFeesLocationId !== location.id && (
+                          <button
+                            onClick={() => handleEditFees(location)}
+                            className="w-full px-3 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm hover:bg-purple-100 transition-colors font-semibold flex items-center justify-center gap-1"
+                          >
+                            <DollarSign className="w-4 h-4" />
+                            تعديل الرسوم الشهرية
+                          </button>
+                        )}
+                      </div>
                     )}
                   </>
                 )}

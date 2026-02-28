@@ -14,6 +14,11 @@ import {
   Package,
   ChevronLeft,
   ChevronRight,
+  CheckCircle,
+  AlertTriangle,
+  Shield,
+  ShieldOff,
+  Utensils,
 } from "lucide-react";
 import { fetchAPI } from "../lib/api";
 
@@ -68,6 +73,46 @@ interface PaymentSummary {
   outstandingAmount: number;
   lastPaymentDate: string | null;
   recentTransactions: PaymentTransaction[];
+  outstandingTiles?: OutstandingPaymentItem[];
+}
+
+// NEW: Outstanding Payment Tile types
+
+type OutstandingReason = "MonthlyFees" | "MissedMeals" | "LostReplacement" | "Other";
+
+interface OutstandingPaymentItem {
+  id: number;
+  studentNationalId: string;
+  reason: OutstandingReason;
+  reasonDisplay: string;
+  amount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  isPaid: boolean;
+  missedMealsCount: number | null;
+  periodReference: string | null;
+  description: string | null;
+  createdAt: string;
+}
+
+interface StudentOutstandingTiles {
+  studentNationalId: string;
+  studentId: string;
+  studentName: string;
+  totalOutstanding: number;
+  tiles: OutstandingPaymentItem[];
+}
+
+interface GlobalExemptionStatus {
+  hasGlobalExemption: boolean;
+  globalExemptionStartDate: string | null;
+  globalExemptionEndDate: string | null;
+}
+
+interface BulkMissedMealsResult {
+  totalStudentsProcessed: number;
+  totalAmountAdded: number;
+  tilesCreated: number;
 }
 
 // Get logged-in user info
@@ -121,6 +166,22 @@ const getEgyptDate = () => {
     return new Date().toISOString().split("T")[0];
   }
 };
+
+// Reason display helpers
+const reasonLabels: Record<OutstandingReason, string> = {
+  MonthlyFees: "الإيجار الشهري",
+  MissedMeals: "غرامة الوجبات الفائتة",
+  LostReplacement: "بدل فاقد",
+  Other: "أخرى",
+};
+
+const reasonColors: Record<OutstandingReason, string> = {
+  MonthlyFees: "blue",
+  MissedMeals: "red",
+  LostReplacement: "orange",
+  Other: "gray",
+};
+
 export default function PaymentManagerArabic() {
   const [students, setStudents] = useState<Student[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
@@ -152,6 +213,28 @@ export default function PaymentManagerArabic() {
     [key: number]: string;
   }>({});
   const [bulkFeesDescription, setBulkFeesDescription] = useState("");
+
+  // NEW: Outstanding tiles state
+  const [outstandingTiles, setOutstandingTiles] = useState<OutstandingPaymentItem[]>([]);
+  const [tilesLoading, setTilesLoading] = useState(false);
+
+  // NEW: Pay tile modal state
+  const [showPayTileModal, setShowPayTileModal] = useState(false);
+  const [selectedTile, setSelectedTile] = useState<OutstandingPaymentItem | null>(null);
+  const [payTileReceiptNumber, setPayTileReceiptNumber] = useState("");
+  const [payTileSubmitting, setPayTileSubmitting] = useState(false);
+
+  // NEW: Bulk missed meals modal state
+  const [showBulkMissedMealsModal, setShowBulkMissedMealsModal] = useState(false);
+  const [bulkMissedMealsFromDate, setBulkMissedMealsFromDate] = useState(getEgyptDate());
+  const [bulkMissedMealsToDate, setBulkMissedMealsToDate] = useState(getEgyptDate());
+  const [bulkMissedMealsApplyGlobalExemption, setBulkMissedMealsApplyGlobalExemption] = useState(false);
+  const [bulkMissedMealsSubmitting, setBulkMissedMealsSubmitting] = useState(false);
+
+  // NEW: Global exemption state
+  const [globalExemption, setGlobalExemption] = useState<GlobalExemptionStatus | null>(null);
+  const [globalExemptionLoading, setGlobalExemptionLoading] = useState(false);
+
   const [paymentFormData, setPaymentFormData] = useState({
     amount: "",
     paymentType: "MonthlyFee" as
@@ -181,6 +264,7 @@ export default function PaymentManagerArabic() {
   // Fetch all students on component mount
   useEffect(() => {
     fetchStudents();
+    fetchGlobalExemptionStatus();
   }, []);
 
   // Filter students based on search term
@@ -270,10 +354,60 @@ export default function PaymentManagerArabic() {
     }
   };
 
+  // NEW: Fetch outstanding tiles for a student
+  const fetchOutstandingTiles = async (studentNationalId: string) => {
+    try {
+      setTilesLoading(true);
+      const data: StudentOutstandingTiles = await fetchAPI(
+        `/api/PaymentTransactions/outstanding-tiles/${studentNationalId}`,
+      );
+      setOutstandingTiles(data?.tiles || []);
+    } catch (err: any) {
+      console.error("Error fetching outstanding tiles:", err);
+      setOutstandingTiles([]);
+    } finally {
+      setTilesLoading(false);
+    }
+  };
+
+  // NEW: Fetch global exemption status
+  const fetchGlobalExemptionStatus = async () => {
+    try {
+      setGlobalExemptionLoading(true);
+      const data: GlobalExemptionStatus = await fetchAPI("/api/PaymentTransactions/global-exemption");
+      setGlobalExemption(data);
+    } catch (err: any) {
+      console.error("Error fetching global exemption:", err);
+      setGlobalExemption(null);
+    } finally {
+      setGlobalExemptionLoading(false);
+    }
+  };
+
+  // NEW: Toggle global exemption
+  const handleToggleGlobalExemption = async () => {
+    const currentlyEnabled = globalExemption?.hasGlobalExemption ?? false;
+    const action = currentlyEnabled ? "إلغاء الإعفاء العام" : "تفعيل الإعفاء العام";
+    if (!confirm(`هل أنت متأكد من ${action}؟`)) return;
+    try {
+      setGlobalExemptionLoading(true);
+      await fetchAPI(`/api/PaymentTransactions/global-exemption?enable=${!currentlyEnabled}`, {
+        method: "POST",
+      });
+      alert(`تم ${action} بنجاح`);
+      await fetchGlobalExemptionStatus();
+    } catch (err: any) {
+      alert(err.message || `حدث خطأ أثناء ${action}`);
+    } finally {
+      setGlobalExemptionLoading(false);
+    }
+  };
+
   const handleSelectStudent = (student: Student) => {
     setSelectedStudent(student);
     setCurrentTransactionPage(1);
     fetchStudentPayments(student.nationalId);
+    fetchOutstandingTiles(student.nationalId);
   };
 
   const handleAddPayment = () => {
@@ -365,6 +499,7 @@ export default function PaymentManagerArabic() {
 
       // Refresh data
       fetchStudentPayments(selectedStudent.nationalId);
+      fetchOutstandingTiles(selectedStudent.nationalId);
     } catch (err: any) {
       console.error("Full error details:", err);
       const errorMsg =
@@ -446,6 +581,7 @@ export default function PaymentManagerArabic() {
       alert("تم حذف العملية الدفعية بنجاح");
       if (selectedStudent) {
         fetchStudentPayments(selectedStudent.nationalId);
+        fetchOutstandingTiles(selectedStudent.nationalId);
       }
     } catch (err: any) {
       alert(err.message || "حدث خطأ أثناء حذف العملية الدفعية");
@@ -498,10 +634,10 @@ export default function PaymentManagerArabic() {
         "/api/PaymentTransactions/bulk/available-dorm-types",
       );
       setBulkFeesDormTypes(data || []);
-      // Initialize amounts object
+      // Initialize amounts from stored monthly fees
       const amounts: { [key: number]: string } = {};
       (data || []).forEach((dorm: any) => {
-        amounts[dorm.dormTypeId] = "";
+        amounts[dorm.dormTypeId] = dorm.storedMonthlyFee ? dorm.storedMonthlyFee.toString() : "";
       });
       setBulkFeesAmounts(amounts);
     } catch (err: any) {
@@ -528,23 +664,23 @@ export default function PaymentManagerArabic() {
       return;
     }
 
-    // Check if all amounts are filled
-    const allFilled = Object.values(bulkFeesAmounts).every(
-      (val) => val.trim() !== "",
-    );
-    if (!allFilled) {
-      alert("يرجى ملء جميع المبالغ");
+    // Build dormTypeAmounts only for fields that have values (backend uses stored values for omitted ones)
+    const dormTypeAmounts: { [key: number]: number } = {};
+    let hasAnyAmount = false;
+    Object.entries(bulkFeesAmounts).forEach(([dormId, amount]) => {
+      if (amount.trim() !== "") {
+        dormTypeAmounts[parseInt(dormId)] = parseFloat(amount);
+        hasAnyAmount = true;
+      }
+    });
+
+    if (!hasAnyAmount) {
+      alert("يرجى ملء مبلغ واحد على الأقل أو التأكد من وجود رسوم مخزنة");
       return;
     }
 
     try {
       setBulkFeesSubmitting(true);
-
-      // Convert amounts to numbers
-      const dormTypeAmounts: { [key: number]: number } = {};
-      Object.entries(bulkFeesAmounts).forEach(([dormId, amount]) => {
-        dormTypeAmounts[parseInt(dormId)] = parseFloat(amount);
-      });
 
       const payload = {
         dormTypeAmounts,
@@ -572,11 +708,106 @@ export default function PaymentManagerArabic() {
       setBulkFeesMonth("");
       setBulkFeesAmounts({});
       setBulkFeesDescription("");
+
+      // Refresh current student if selected
+      if (selectedStudent) {
+        fetchStudentPayments(selectedStudent.nationalId);
+        fetchOutstandingTiles(selectedStudent.nationalId);
+      }
     } catch (err: any) {
       console.error("Error submitting bulk fees:", err);
       alert(err.message || "حدث خطأ أثناء إضافة الرسوم");
     } finally {
       setBulkFeesSubmitting(false);
+    }
+  };
+
+  // NEW: Pay Tile handlers
+  const handleOpenPayTileModal = (tile: OutstandingPaymentItem) => {
+    setSelectedTile(tile);
+    setPayTileReceiptNumber("");
+    setShowPayTileModal(true);
+  };
+
+  const handlePayTileSubmit = async () => {
+    if (!selectedTile || !selectedStudent) return;
+    if (!payTileReceiptNumber.trim()) {
+      alert("يرجى إدخال رقم الإيصال");
+      return;
+    }
+    try {
+      setPayTileSubmitting(true);
+      await fetchAPI(`/api/PaymentTransactions/outstanding-tiles/${selectedTile.id}/pay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ receiptNumber: payTileReceiptNumber.trim() }),
+      });
+      alert("تم الدفع بنجاح");
+      setShowPayTileModal(false);
+      setSelectedTile(null);
+      setPayTileReceiptNumber("");
+      fetchOutstandingTiles(selectedStudent.nationalId);
+      fetchStudentPayments(selectedStudent.nationalId);
+      fetchStudents();
+    } catch (err: any) {
+      console.error("Error paying tile:", err);
+      alert(err.response?.data?.message || err.message || "حدث خطأ أثناء عملية الدفع");
+    } finally {
+      setPayTileSubmitting(false);
+    }
+  };
+
+  // NEW: Bulk Missed Meals handlers
+  const handleBulkMissedMealsOpen = () => {
+    setBulkMissedMealsFromDate(getEgyptDate());
+    setBulkMissedMealsToDate(getEgyptDate());
+    setBulkMissedMealsApplyGlobalExemption(false);
+    setShowBulkMissedMealsModal(true);
+  };
+
+  const handleBulkMissedMealsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkMissedMealsFromDate || !bulkMissedMealsToDate) {
+      alert("يرجى اختيار تاريخ البداية والنهاية");
+      return;
+    }
+    if (new Date(bulkMissedMealsFromDate) > new Date(bulkMissedMealsToDate)) {
+      alert("تاريخ البداية يجب أن يكون قبل تاريخ النهاية");
+      return;
+    }
+    try {
+      setBulkMissedMealsSubmitting(true);
+      const payload = {
+        fromDate: bulkMissedMealsFromDate,
+        toDate: bulkMissedMealsToDate,
+        applyGlobalExemption: bulkMissedMealsApplyGlobalExemption,
+      };
+      const result: BulkMissedMealsResult = await fetchAPI(
+        "/api/PaymentTransactions/bulk/add-missed-meals",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+      alert(
+        `تم إضافة غرامات الوجبات الفائتة بنجاح!\n\n` +
+          `عدد الطلاب المعالجين: ${result.totalStudentsProcessed}\n` +
+          `الإجمالي المضاف: ${formatCurrency(result.totalAmountAdded)}\n` +
+          `عدد البطاقات المنشأة: ${result.tilesCreated}`,
+      );
+      setShowBulkMissedMealsModal(false);
+      fetchGlobalExemptionStatus();
+      if (selectedStudent) {
+        fetchStudentPayments(selectedStudent.nationalId);
+        fetchOutstandingTiles(selectedStudent.nationalId);
+      }
+      fetchStudents();
+    } catch (err: any) {
+      console.error("Error submitting bulk missed meals:", err);
+      alert(err.message || "حدث خطأ أثناء إضافة غرامات الوجبات الفائتة");
+    } finally {
+      setBulkMissedMealsSubmitting(false);
     }
   };
 
@@ -716,16 +947,25 @@ export default function PaymentManagerArabic() {
                 إدارة مدفوعات وتصاريح الطلاب في السكن الجامعي
               </p>
             </div>
-            <div className="flex items-center gap-4">
-              {/* Bulk Fees Button - Only for Registration Users */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Bulk Buttons - Only for Registration Users */}
               {currentUser.role === "Registration" && (
-                <button
-                  onClick={handleBulkFeesOpen}
-                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center gap-2 whitespace-nowrap"
-                >
-                  <Plus className="w-5 h-5" />
-                  إضافة رسوم شهرية
-                </button>
+                <>
+                  <button
+                    onClick={handleBulkFeesOpen}
+                    className="px-5 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <Plus className="w-5 h-5" />
+                    إضافة رسوم شهرية
+                  </button>
+                  <button
+                    onClick={handleBulkMissedMealsOpen}
+                    className="px-5 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <Utensils className="w-5 h-5" />
+                    إضافة غرامات وجبات فائتة
+                  </button>
+                </>
               )}
               {currentUser.username && (
                 <div className="bg-blue-50 px-4 py-2 rounded-lg">
@@ -738,6 +978,55 @@ export default function PaymentManagerArabic() {
               )}
             </div>
           </div>
+
+          {/* Global Exemption Widget */}
+          {currentUser.role === "Registration" && (
+            <div className="mt-4 p-4 rounded-lg border border-gray-200 bg-gray-50">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  {globalExemption?.hasGlobalExemption ? (
+                    <Shield className="w-6 h-6 text-green-600" />
+                  ) : (
+                    <ShieldOff className="w-6 h-6 text-gray-400" />
+                  )}
+                  <div>
+                    <p className="font-semibold text-gray-900">
+                      الإعفاء العام من استلام الوجبات
+                    </p>
+                    {globalExemption?.hasGlobalExemption ? (
+                      <p className="text-sm text-green-700">
+                        مفعّل — من{" "}
+                        {globalExemption.globalExemptionStartDate
+                          ? formatDate(globalExemption.globalExemptionStartDate)
+                          : "—"}{" "}
+                        إلى{" "}
+                        {globalExemption.globalExemptionEndDate
+                          ? formatDate(globalExemption.globalExemptionEndDate)
+                          : "—"}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-500">غير مفعّل</p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={handleToggleGlobalExemption}
+                  disabled={globalExemptionLoading}
+                  className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                    globalExemption?.hasGlobalExemption
+                      ? "bg-red-100 text-red-700 hover:bg-red-200"
+                      : "bg-green-100 text-green-700 hover:bg-green-200"
+                  } disabled:opacity-50`}
+                >
+                  {globalExemptionLoading
+                    ? "جاري..."
+                    : globalExemption?.hasGlobalExemption
+                      ? "إلغاء الإعفاء"
+                      : "تفعيل الإعفاء"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -977,6 +1266,122 @@ export default function PaymentManagerArabic() {
                     )}
                   </div>
                 )}
+
+                {/* Outstanding Payment Tiles (NEW) */}
+                <div className="p-4 border-b border-gray-200">
+                  <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-500" />
+                    المبالغ المستحقة
+                  </h3>
+                  {tilesLoading ? (
+                    <p className="text-gray-500 text-center py-4">جاري التحميل...</p>
+                  ) : outstandingTiles.length === 0 ? (
+                    <div className="text-center py-6">
+                      <CheckCircle className="w-10 h-10 text-green-400 mx-auto mb-2" />
+                      <p className="text-gray-500">لا توجد مبالغ مستحقة</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {outstandingTiles.map((tile) => {
+                        const color = reasonColors[tile.reason] || "gray";
+                        const bgClass = tile.isPaid
+                          ? "border-green-200 bg-green-50 opacity-70"
+                          : color === "blue"
+                            ? "border-blue-200 bg-blue-50"
+                            : color === "red"
+                              ? "border-red-200 bg-red-50"
+                              : color === "orange"
+                                ? "border-orange-200 bg-orange-50"
+                                : "border-gray-200 bg-gray-50";
+                        const textClass =
+                          color === "blue"
+                            ? "text-blue-700"
+                            : color === "red"
+                              ? "text-red-700"
+                              : color === "orange"
+                                ? "text-orange-700"
+                                : "text-gray-700";
+                        const iconClass =
+                          color === "blue"
+                            ? "text-blue-600"
+                            : color === "red"
+                              ? "text-red-600"
+                              : color === "orange"
+                                ? "text-orange-600"
+                                : "text-gray-600";
+                        return (
+                          <div
+                            key={tile.id}
+                            className={`p-4 rounded-lg border-2 ${bgClass}`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className={iconClass}>
+                                    {tile.reason === "MonthlyFees" && <CreditCard className="w-5 h-5" />}
+                                    {tile.reason === "MissedMeals" && <Utensils className="w-5 h-5" />}
+                                    {tile.reason === "LostReplacement" && <Package className="w-5 h-5" />}
+                                    {tile.reason === "Other" && <FileText className="w-5 h-5" />}
+                                  </span>
+                                  <span className={`font-bold ${textClass}`}>
+                                    {tile.reasonDisplay || reasonLabels[tile.reason] || tile.reason}
+                                  </span>
+                                  {tile.isPaid && (
+                                    <span className="px-2 py-0.5 bg-green-200 text-green-800 text-xs rounded-full font-semibold">
+                                      مدفوع
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 text-sm mb-1">
+                                  <div>
+                                    <span className="text-gray-500">الإجمالي:</span>{" "}
+                                    <span className="font-semibold">{formatCurrency(tile.amount)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">المدفوع:</span>{" "}
+                                    <span className="font-semibold text-green-700">
+                                      {formatCurrency(tile.paidAmount)}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">المتبقي:</span>{" "}
+                                    <span className="font-semibold text-red-700">
+                                      {formatCurrency(tile.remainingAmount)}
+                                    </span>
+                                  </div>
+                                </div>
+                                {tile.missedMealsCount != null && tile.missedMealsCount > 0 && (
+                                  <p className="text-xs text-gray-500">
+                                    عدد الوجبات الفائتة: {tile.missedMealsCount}
+                                  </p>
+                                )}
+                                {tile.periodReference && (
+                                  <p className="text-xs text-gray-500">الفترة: {tile.periodReference}</p>
+                                )}
+                                {tile.description && (
+                                  <p className="text-xs text-gray-500">{tile.description}</p>
+                                )}
+                                <p className="text-xs text-gray-400 mt-1">
+                                  أنشئ في: {formatDateTime(tile.createdAt)}
+                                </p>
+                              </div>
+                              {/* Pay button */}
+                              {!tile.isPaid && (
+                                <button
+                                  onClick={() => handleOpenPayTileModal(tile)}
+                                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold text-sm flex items-center gap-1 mr-3"
+                                >
+                                  <DollarSign className="w-4 h-4" />
+                                  دفع
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
 
                 {/* Recent Payments */}
                 <div className="p-4">
@@ -1652,7 +2057,7 @@ export default function PaymentManagerArabic() {
                 {bulkFeesDormTypes.length > 0 ? (
                   <div>
                     <label className="block text-gray-700 font-semibold mb-4">
-                      إدخل المبلغ لكل نوع مبنى *
+                      إدخل المبلغ لكل نوع مبنى (القيم المخزنة محملة تلقائياً)
                     </label>
                     <div className="space-y-3">
                       {bulkFeesDormTypes.map((dorm) => (
@@ -1666,20 +2071,15 @@ export default function PaymentManagerArabic() {
                             </label>
                             <span className="text-sm text-gray-500">
                               {dorm.studentCount} طالب
+                              {dorm.storedMonthlyFee ? ` • محفوظ: ${dorm.storedMonthlyFee} جنيه` : ""}
                             </span>
                           </div>
                           <input
                             type="number"
-                            placeholder="أدخل المبلغ"
+                            readOnly
+                            placeholder={dorm.storedMonthlyFee ? `القيمة المخزنة: ${dorm.storedMonthlyFee}` : "أدخل المبلغ"}
                             value={bulkFeesAmounts[dorm.dormTypeId] || ""}
-                            onChange={(e) =>
-                              setBulkFeesAmounts({
-                                ...bulkFeesAmounts,
-                                [dorm.dormTypeId]: e.target.value,
-                              })
-                            }
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            required
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed"
                             min="0"
                             step="0.01"
                           />
@@ -1721,16 +2121,19 @@ export default function PaymentManagerArabic() {
                       {bulkFeesDormTypes.map((dorm) => {
                         const amount = bulkFeesAmounts[dorm.dormTypeId];
                         if (!amount || amount === "") return null;
-                        const totalForDorm =
-                          parseFloat(amount) * dorm.studentCount;
+                        const eligibleCount = dorm.nonExemptCount || 0;
+                        const exemptCount = Math.max(0, dorm.studentCount - eligibleCount);
+                        const totalForDorm = parseFloat(amount) * eligibleCount;
                         return (
-                          <div key={dorm.dormTypeId} className="text-sm">
-                            <span className="text-green-600">
-                              {dorm.dormTypeName}:{" "}
-                              {formatCurrency(parseFloat(amount))} ×{" "}
-                              {dorm.studentCount} ={" "}
-                              {formatCurrency(totalForDorm)}
-                            </span>
+                          <div key={dorm.dormTypeId} className="text-sm space-y-1">
+                            <div className="text-green-600">
+                              {dorm.dormTypeName}: {formatCurrency(parseFloat(amount))} × {eligibleCount} = {formatCurrency(totalForDorm)}
+                            </div>
+                            {exemptCount > 0 && (
+                              <div className="text-xs text-gray-600">
+                                المعفيون: {exemptCount} طالب (لم تُحتسب في الإجمالي)
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -1739,14 +2142,38 @@ export default function PaymentManagerArabic() {
                         {formatCurrency(
                           bulkFeesDormTypes.reduce((total, dorm) => {
                             const amount = bulkFeesAmounts[dorm.dormTypeId];
-                            return (
-                              total +
-                              (amount && amount !== ""
-                                ? parseFloat(amount) * dorm.studentCount
-                                : 0)
-                            );
+                            if (!amount || amount === "") return total;
+                            const eligibleCount = dorm.nonExemptCount || 0;
+                            return total + parseFloat(amount) * eligibleCount;
                           }, 0),
                         )}
+                      </div>
+
+                      {/* Summary Stats */}
+                      <div className="border-t border-green-200 pt-3 mt-3 space-y-2 text-sm">
+                        <div className="flex justify-between text-green-700">
+                          <span>عدد الطلاب المؤهلين:</span>
+                          <span className="font-semibold">
+                            {bulkFeesDormTypes.reduce((total, dorm) => {
+                              const amount = bulkFeesAmounts[dorm.dormTypeId];
+                              if (!amount || amount === "") return total;
+                              return total + (dorm.nonExemptCount || 0);
+                            }, 0)}{" "}
+                            طالب
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-orange-600">
+                          <span>عدد الطلاب المعفيين:</span>
+                          <span className="font-semibold">
+                            {bulkFeesDormTypes.reduce((total, dorm) => {
+                              const amount = bulkFeesAmounts[dorm.dormTypeId];
+                              if (!amount || amount === "") return total;
+                              const exemptCount = Math.max(0, dorm.studentCount - (dorm.nonExemptCount || 0));
+                              return total + exemptCount;
+                            }, 0)}{" "}
+                            طالب (تكلفة: {formatCurrency(0)})
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1773,6 +2200,197 @@ export default function PaymentManagerArabic() {
                     className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {bulkFeesSubmitting ? "جاري الإضافة..." : "إضافة الرسوم"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pay Tile Modal (NEW) */}
+      {showPayTileModal && selectedTile && selectedStudent && (
+        <div className="fixed inset-0 bg-black/50 overflow-y-auto z-50">
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-md w-full" dir="rtl">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">دفع مبلغ مستحق</h2>
+                <button
+                  onClick={() => setShowPayTileModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded transition-colors"
+                >
+                  <X className="w-6 h-6 text-gray-600" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-5">
+                {/* Student info */}
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <div className="flex items-start gap-2 mb-2">
+                    <Lock className="w-4 h-4 text-blue-600 mt-1" />
+                    <p className="text-gray-700 font-semibold">معلومات الطالب</p>
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <p>
+                      <span className="font-semibold">الاسم:</span> {selectedStudent.firstName}{" "}
+                      {selectedStudent.lastName}
+                    </p>
+                    <p>
+                      <span className="font-semibold">الرقم الجامعي:</span> {selectedStudent.studentId}
+                    </p>
+                    <p>
+                      <span className="font-semibold">الرقم القومي:</span> {selectedStudent.nationalId}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tile info */}
+                <div className="p-4 rounded-lg border bg-amber-50 border-amber-200">
+                  <p className="font-bold text-gray-800 mb-2">
+                    {selectedTile.reasonDisplay || reasonLabels[selectedTile.reason]}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-gray-500">الإجمالي:</span>{" "}
+                      <span className="font-semibold">{formatCurrency(selectedTile.amount)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">المتبقي:</span>{" "}
+                      <span className="font-semibold text-red-700">
+                        {formatCurrency(selectedTile.remainingAmount)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Receipt number input */}
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">رقم الإيصال *</label>
+                  <input
+                    type="text"
+                    value={payTileReceiptNumber}
+                    onChange={(e) => setPayTileReceiptNumber(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="أدخل رقم الإيصال"
+                    required
+                  />
+                </div>
+
+                {currentUser.username && (
+                  <p className="text-blue-700 text-sm">
+                    <User className="w-4 h-4 inline-block ml-1" />
+                    سيتم تسجيل هذه العملية باسم: <span className="font-semibold">{currentUser.username}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="p-6 border-t border-gray-200">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowPayTileModal(false)}
+                    className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePayTileSubmit}
+                    disabled={payTileSubmitting || !payTileReceiptNumber.trim()}
+                    className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {payTileSubmitting ? "جاري الدفع..." : `دفع ${formatCurrency(selectedTile.remainingAmount)}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Missed Meals Modal (NEW) */}
+      {showBulkMissedMealsModal && (
+        <div className="fixed inset-0 bg-black/50 overflow-y-auto z-50">
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-md w-full" dir="rtl">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 shrink-0">
+                <h2 className="text-xl font-bold text-gray-900">إضافة غرامات الوجبات الفائتة</h2>
+                <button
+                  onClick={() => setShowBulkMissedMealsModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded transition-colors"
+                >
+                  <X className="w-6 h-6 text-gray-600" />
+                </button>
+              </div>
+
+              <form onSubmit={handleBulkMissedMealsSubmit} className="p-6 space-y-6">
+                <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-amber-800">تنبيه</p>
+                      <p className="text-sm text-amber-700">
+                        سيتم حساب غرامة الوجبات الفائتة لجميع الطلاب (بما فيهم المعفيين من الرسوم) للفترة المحددة.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">تاريخ البداية *</label>
+                  <input
+                    type="date"
+                    value={bulkMissedMealsFromDate}
+                    onChange={(e) => setBulkMissedMealsFromDate(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">تاريخ النهاية *</label>
+                  <input
+                    type="date"
+                    value={bulkMissedMealsToDate}
+                    onChange={(e) => setBulkMissedMealsToDate(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                {/* Global Exemption Checkbox */}
+                <div className="p-4 rounded-lg border border-green-200 bg-green-50">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={bulkMissedMealsApplyGlobalExemption}
+                      onChange={(e) => setBulkMissedMealsApplyGlobalExemption(e.target.checked)}
+                      className="mt-1 w-5 h-5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    />
+                    <div>
+                      <p className="font-semibold text-green-800">تطبيق الإعفاء العام لجميع الطلاب</p>
+                      <p className="text-sm text-green-700 mt-1">
+                        عند التفعيل، سيتم تفعيل الإعفاء العام من اليوم حتى نهاية الشهر الحالي. لن يتم حظر الطلاب
+                        المدينين من استلام الوجبات خلال هذه الفترة.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setShowBulkMissedMealsModal(false)}
+                    className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={bulkMissedMealsSubmitting}
+                    className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {bulkMissedMealsSubmitting ? "جاري المعالجة..." : "إضافة الغرامات"}
                   </button>
                 </div>
               </form>
