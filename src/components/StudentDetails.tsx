@@ -20,6 +20,7 @@ import {
   Shield,
   Heart,
   DollarSign,
+  Ban,
 } from "lucide-react";
 import { fetchAPI } from "../lib/api";
 import { resolvePhotoUrl } from "../utils/resolvePhotoUrl";
@@ -96,6 +97,14 @@ export default function StudentDetails() {
   const navigate = useNavigate();
   const [student, setStudent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showOutstandingModal, setShowOutstandingModal] = useState(false);
+  const [outstandingAmount, setOutstandingAmount] = useState("");
+  const [outstandingReason, setOutstandingReason] = useState("");
+  const [savingOutstanding, setSavingOutstanding] = useState(false);
+
+  // Check if current user is registration
+  const userRole = localStorage.getItem("role");
+  const isRegistration = userRole === "registration";
 
   useEffect(() => {
     if (id) {
@@ -139,6 +148,38 @@ export default function StudentDetails() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSetOutstandingAmount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!student) return;
+
+    const amount = parseFloat(outstandingAmount);
+    if (isNaN(amount) || amount < 0) {
+      toast.error("يرجى إدخال مبلغ صحيح");
+      return;
+    }
+
+    try {
+      setSavingOutstanding(true);
+      await fetchAPI(`/api/Students/${student.studentId}/outstanding-amount`, {
+        method: "PUT",
+        body: JSON.stringify({
+          amount: amount,
+          reason: outstandingReason.trim() || "مبلغ مستحق",
+        }),
+      });
+      toast.success("تم تحديث المبلغ المستحق بنجاح");
+      setShowOutstandingModal(false);
+      setOutstandingAmount("");
+      setOutstandingReason("");
+      // Reload student to see updated data
+      loadStudent(student.studentId);
+    } catch (error: any) {
+      toast.error(error.message || "فشل تحديث المبلغ المستحق");
+    } finally {
+      setSavingOutstanding(false);
     }
   };
 
@@ -496,10 +537,145 @@ export default function StudentDetails() {
                   </div>
                 </div>
               </div>
+
+              {/* Outstanding Amount Card - Registration Only */}
+              {isRegistration && (
+                <div
+                  className={`rounded-lg p-6 ${student.outstandingAmount > 0 ? "bg-red-50 border-2 border-red-200" : "bg-gray-50"}`}
+                >
+                  <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <Ban className="w-5 h-5 text-red-600" />
+                    المبلغ المستحق (إيقاف المسح)
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">المبلغ المستحق:</span>
+                      <span
+                        className={`font-bold text-xl ${student.outstandingAmount > 0 ? "text-red-600" : "text-green-600"}`}
+                      >
+                        {student.outstandingAmount > 0
+                          ? `${student.outstandingAmount} جنيه`
+                          : "لا يوجد"}
+                      </span>
+                    </div>
+                    {student.outstandingAmount > 0 && (
+                      <div className="bg-red-100 border border-red-300 rounded-lg p-3">
+                        <p className="text-sm text-red-800 font-semibold">
+                          ⚠ هذا الطالب لن يتمكن من مسح الوجبات حتى يتم تسوية
+                          المبلغ المستحق
+                        </p>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => {
+                        setOutstandingAmount(
+                          student.outstandingAmount?.toString() || "0",
+                        );
+                        setOutstandingReason("");
+                        setShowOutstandingModal(true);
+                      }}
+                      className="w-full mt-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold flex items-center justify-center gap-2"
+                    >
+                      <DollarSign className="w-5 h-5" />
+                      {student.outstandingAmount > 0
+                        ? "تعديل المبلغ المستحق"
+                        : "إضافة مبلغ مستحق"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Outstanding Amount Modal */}
+      {showOutstandingModal && student && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full" dir="rtl">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">
+                تحديد المبلغ المستحق
+              </h2>
+              <button
+                onClick={() => setShowOutstandingModal(false)}
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleSetOutstandingAmount}
+              className="p-6 space-y-6"
+            >
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <p className="text-gray-700">
+                  <span className="font-semibold">الطالب:</span>{" "}
+                  {student.firstName} {student.lastName}
+                </p>
+                <p className="text-gray-700">
+                  <span className="font-semibold">الرقم الجامعي:</span>{" "}
+                  {student.studentId}
+                </p>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-sm text-yellow-800">
+                  <strong>تنبيه:</strong> إضافة مبلغ مستحق سيمنع الطالب من مسح
+                  الوجبات في المطعم. لإعادة تفعيل المسح، أدخل المبلغ 0.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  المبلغ المستحق (جنيه) *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={outstandingAmount}
+                  onChange={(e) => setOutstandingAmount(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-lg"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">
+                  السبب
+                </label>
+                <input
+                  type="text"
+                  value={outstandingReason}
+                  onChange={(e) => setOutstandingReason(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  placeholder="مثال: غرامة وجبات فائتة"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowOutstandingModal(false)}
+                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingOutstanding}
+                  className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold disabled:opacity-50"
+                >
+                  {savingOutstanding ? "جاري الحفظ..." : "حفظ"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

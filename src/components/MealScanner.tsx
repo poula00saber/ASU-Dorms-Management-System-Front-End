@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import { API_BASE } from "../lib/api";
 import {
   Scan,
@@ -11,7 +11,7 @@ import {
 import { toast } from "sonner";
 
 interface MealScannerProps {
-  mealType: "breakfast-dinner" | "lunch";
+  mealType: "breakfast-dinner" | "lunch" | "combined";
 }
 
 interface ScanRecord {
@@ -106,7 +106,16 @@ export default function MealScanner({ mealType }: MealScannerProps) {
   const getMealInfo = () => {
     const hour = currentTime.getHours();
 
-    if (mealType === "breakfast-dinner") {
+    if (mealType === "combined") {
+      if (hour >= 13 && hour < 24) {
+        return { name: "وجبة مجمعة", time: "1:00 PM - 9:00 PM", active: true };
+      }
+      return {
+        name: "وجبة مجمعة",
+        time: "خارج ساعات الوجبات",
+        active: false,
+      };
+    } else if (mealType === "breakfast-dinner") {
       if (hour >= 0 && hour < 2) {
         return { name: "عشاء", time: "6:00 PM - 9:00 PM", active: true };
       }
@@ -158,9 +167,11 @@ export default function MealScanner({ mealType }: MealScannerProps) {
     try {
       const token =
         localStorage.getItem("authToken") || localStorage.getItem("token");
+      const isCombined = mealType === "combined";
+      const endpoint = isCombined ? "scan-combined" : "scan";
       const mealTypeId = mealType === "breakfast-dinner" ? 1 : 2;
 
-      const res = await fetch(`${API_BASE}/api/Meals/scan`, {
+      const res = await fetch(`${API_BASE}/api/Meals/${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -168,7 +179,7 @@ export default function MealScanner({ mealType }: MealScannerProps) {
         },
         body: JSON.stringify({
           nationalId: nationalId.trim(),
-          mealTypeId: mealTypeId,
+          mealTypeId: isCombined ? 0 : mealTypeId,
         }),
       });
 

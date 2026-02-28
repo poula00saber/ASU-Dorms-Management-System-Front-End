@@ -447,13 +447,17 @@ export default function HolidayManagerArabic() {
                                 </div>
                               )}
                             </div>
-                            <button
-                              onClick={() => handleDeleteHoliday(holiday.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="حذف الإجازة"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
+                            {/* Only show delete button if holiday end date hasn't passed */}
+                            {new Date(holiday.endDate) >=
+                              new Date(new Date().toDateString()) && (
+                              <button
+                                onClick={() => handleDeleteHoliday(holiday.id)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="إلغاء التصريح"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}
