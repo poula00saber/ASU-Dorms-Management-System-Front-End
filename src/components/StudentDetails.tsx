@@ -26,39 +26,73 @@ import { fetchAPI } from "../lib/api";
 import { resolvePhotoUrl } from "../utils/resolvePhotoUrl";
 
 // Helper functions for translations
-const translateReligion = (religion: number): string => {
-  switch (religion) {
-    case 1:
-      return "مسلم";
-    case 2:
-      return "مسيحي";
-    case 3:
-      return "أخرى";
-    default:
-      return "غير محدد";
+const translateReligion = (religion: number | string): string => {
+  if (typeof religion === "number") {
+    switch (religion) {
+      case 1:
+        return "مسلم";
+      case 2:
+        return "مسيحي";
+      case 3:
+        return "أخرى";
+      default:
+        return "غير محدد";
+    }
+  } else {
+    // Handle string values from API
+    switch (religion) {
+      case "Muslim":
+        return "مسلم";
+      case "Christian":
+        return "مسيحي";
+      case "Other":
+        return "أخرى";
+      default:
+        return religion;
+    }
   }
 };
 
-const translateStatus = (status: number): string => {
-  switch (status) {
-    case 0:
-      return "غير نشط";
-    case 1:
-      return "نشط";
-    case 2:
-      return "متخرج";
-    case 3:
-      return "منقول";
-    default:
-      return "غير محدد";
+const translateStatus = (status: number | string): string => {
+  if (typeof status === "number") {
+    switch (status) {
+      case 0:
+        return "غير نشط";
+      case 1:
+        return "نشط";
+      case 2:
+        return "متخرج";
+      case 3:
+        return "منقول";
+      default:
+        return "غير محدد";
+    }
+  } else {
+    // Handle string values from API
+    switch (status) {
+      case "NewStudent":
+        return "طالب جديد";
+      case "ActiveStudent":
+        return "طالب نشط";
+      case "GraduatedStudent":
+        return "طالب متخرج";
+      case "TransferredStudent":
+        return "طالب منقول";
+      case "InactiveStudent":
+        return "طالب غير نشط";
+      default:
+        return status;
+    }
   }
 };
 
 const translateDormType = (dormType: number | string): string => {
+  // Dorm types are now fetched from backend as strings
   if (typeof dormType === "string") {
-    return dormType;
+    return dormType; // Use the name directly from backend
   }
 
+  // Legacy numeric handling (for backward compatibility)
   switch (dormType) {
     case 1:
       return "عادي";
@@ -395,7 +429,11 @@ export default function StudentDetails() {
                       <span className="text-gray-600">الحالة:</span>
                       <span
                         className={`font-semibold ${
-                          student.status === 1
+                          typeof student.status === "string"
+                            ? ["NewStudent", "ActiveStudent"].includes(student.status)
+                              ? "text-green-600"
+                              : "text-red-600"
+                            : student.status === 1
                             ? "text-green-600"
                             : "text-red-600"
                         }`}

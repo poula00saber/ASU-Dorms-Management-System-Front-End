@@ -34,15 +34,7 @@ const dormLocationMap: Record<number, string> = {
   7: "الزيتون",
 };
 
-// Arabic translations for dorm types (kept for potential future use)
-const dormTypeTranslations: Record<string, string> = {
-  "1": "عادي",
-  "2": "مميز",
-  "3": "فندقي",
-  Normal: "عادي",
-  Premium: "مميز",
-  Hotel: "فندقي",
-};
+// Dorm types are now fetched from backend - no hardcoded mapping needed
 
 export default function StudentIdPrinter() {
   const [students, setStudents] = useState<Student[]>([]);

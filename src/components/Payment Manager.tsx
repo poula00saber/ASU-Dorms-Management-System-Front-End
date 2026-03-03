@@ -210,7 +210,7 @@ export default function PaymentManagerArabic() {
   const [bulkFeesMonth, setBulkFeesMonth] = useState("");
   const [bulkFeesDormTypes, setBulkFeesDormTypes] = useState<any[]>([]);
   const [bulkFeesAmounts, setBulkFeesAmounts] = useState<{
-    [key: number]: string;
+    [key: string]: string;
   }>({});
   const [bulkFeesDescription, setBulkFeesDescription] = useState("");
 
@@ -634,10 +634,10 @@ export default function PaymentManagerArabic() {
         "/api/PaymentTransactions/bulk/available-dorm-types",
       );
       setBulkFeesDormTypes(data || []);
-      // Initialize amounts from stored monthly fees
-      const amounts: { [key: number]: string } = {};
+      // Initialize amounts from stored monthly fees using dorm type name as key
+      const amounts: { [key: string]: string } = {};
       (data || []).forEach((dorm: any) => {
-        amounts[dorm.dormTypeId] = dorm.storedMonthlyFee ? dorm.storedMonthlyFee.toString() : "";
+        amounts[dorm.dormTypeName] = dorm.storedMonthlyFee ? dorm.storedMonthlyFee.toString() : "";
       });
       setBulkFeesAmounts(amounts);
     } catch (err: any) {
@@ -665,11 +665,11 @@ export default function PaymentManagerArabic() {
     }
 
     // Build dormTypeAmounts only for fields that have values (backend uses stored values for omitted ones)
-    const dormTypeAmounts: { [key: number]: number } = {};
+    const dormTypeAmounts: { [key: string]: number } = {};
     let hasAnyAmount = false;
-    Object.entries(bulkFeesAmounts).forEach(([dormId, amount]) => {
+    Object.entries(bulkFeesAmounts).forEach(([dormTypeName, amount]) => {
       if (amount.trim() !== "") {
-        dormTypeAmounts[parseInt(dormId)] = parseFloat(amount);
+        dormTypeAmounts[dormTypeName] = parseFloat(amount);
         hasAnyAmount = true;
       }
     });
@@ -2078,7 +2078,7 @@ export default function PaymentManagerArabic() {
                             type="number"
                             readOnly
                             placeholder={dorm.storedMonthlyFee ? `القيمة المخزنة: ${dorm.storedMonthlyFee}` : "أدخل المبلغ"}
-                            value={bulkFeesAmounts[dorm.dormTypeId] || ""}
+                            value={bulkFeesAmounts[dorm.dormTypeName] || ""}
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed"
                             min="0"
                             step="0.01"
@@ -2119,13 +2119,13 @@ export default function PaymentManagerArabic() {
                     </p>
                     <div className="space-y-1">
                       {bulkFeesDormTypes.map((dorm) => {
-                        const amount = bulkFeesAmounts[dorm.dormTypeId];
+                        const amount = bulkFeesAmounts[dorm.dormTypeName];
                         if (!amount || amount === "") return null;
                         const eligibleCount = dorm.nonExemptCount || 0;
                         const exemptCount = Math.max(0, dorm.studentCount - eligibleCount);
                         const totalForDorm = parseFloat(amount) * eligibleCount;
                         return (
-                          <div key={dorm.dormTypeId} className="text-sm space-y-1">
+                          <div key={dorm.dormTypeName} className="text-sm space-y-1">
                             <div className="text-green-600">
                               {dorm.dormTypeName}: {formatCurrency(parseFloat(amount))} × {eligibleCount} = {formatCurrency(totalForDorm)}
                             </div>
@@ -2141,7 +2141,7 @@ export default function PaymentManagerArabic() {
                         الإجمالي:{" "}
                         {formatCurrency(
                           bulkFeesDormTypes.reduce((total, dorm) => {
-                            const amount = bulkFeesAmounts[dorm.dormTypeId];
+                            const amount = bulkFeesAmounts[dorm.dormTypeName];
                             if (!amount || amount === "") return total;
                             const eligibleCount = dorm.nonExemptCount || 0;
                             return total + parseFloat(amount) * eligibleCount;
@@ -2155,7 +2155,7 @@ export default function PaymentManagerArabic() {
                           <span>عدد الطلاب المؤهلين:</span>
                           <span className="font-semibold">
                             {bulkFeesDormTypes.reduce((total, dorm) => {
-                              const amount = bulkFeesAmounts[dorm.dormTypeId];
+                              const amount = bulkFeesAmounts[dorm.dormTypeName];
                               if (!amount || amount === "") return total;
                               return total + (dorm.nonExemptCount || 0);
                             }, 0)}{" "}
@@ -2166,7 +2166,7 @@ export default function PaymentManagerArabic() {
                           <span>عدد الطلاب المعفيين:</span>
                           <span className="font-semibold">
                             {bulkFeesDormTypes.reduce((total, dorm) => {
-                              const amount = bulkFeesAmounts[dorm.dormTypeId];
+                              const amount = bulkFeesAmounts[dorm.dormTypeName];
                               if (!amount || amount === "") return total;
                               const exemptCount = Math.max(0, dorm.studentCount - (dorm.nonExemptCount || 0));
                               return total + exemptCount;

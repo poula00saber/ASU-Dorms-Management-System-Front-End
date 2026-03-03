@@ -14,6 +14,9 @@ export default function StudentForm() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoUploaded, setPhotoUploaded] = useState(false);
 
+  // Available dorm types from backend
+  const [availableDormTypes, setAvailableDormTypes] = useState<string[]>([]);
+
   // Ain Shams University Faculties
   const ainShamsFaculties = [
     "كلية الهندسة",
@@ -88,10 +91,10 @@ export default function StudentForm() {
     isEgyptian: true,
     firstName: "",
     lastName: "",
-    status: 1,
+    status: "NewStudent",
     email: "",
     phoneNumber: "",
-    religion: 1,
+    religion: "Muslim",
     government: "",
     district: "",
     streetName: "",
@@ -102,7 +105,7 @@ export default function StudentForm() {
     secondarySchoolName: "",
     secondarySchoolGovernment: "",
     highSchoolPercentage: null,
-    dormType: 1,
+    dormType: "",
     buildingNumber: "",
     roomNumber: "",
     hasSpecialNeeds: false,
@@ -243,6 +246,10 @@ export default function StudentForm() {
     setLoading(true);
 
     try {
+      // Map string enum names to integer values expected by backend
+      const statusMap: Record<string, number> = { NewStudent: 1, OldStudent: 2 };
+      const religionMap: Record<string, number> = { Muslim: 1, Christian: 2, Other: 3 };
+
       // Prepare the data
       const studentData = {
         studentId: formData.studentId,
@@ -250,15 +257,15 @@ export default function StudentForm() {
         isEgyptian: formData.isEgyptian,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        status: parseInt(formData.status),
+        status: statusMap[formData.status] || 1,
         email: formData.email,
         phoneNumber: formData.phoneNumber,
-        religion: parseInt(formData.religion),
+        religion: religionMap[formData.religion] || 1,
         government: formData.government,
         district: formData.district,
         streetName: formData.streetName || "",
         faculty: formData.faculty,
-        level: parseInt(formData.level),
+        level: formData.level,
         grade: formData.grade,
         percentageGrade: formData.percentageGrade
           ? parseFloat(formData.percentageGrade)
@@ -268,7 +275,8 @@ export default function StudentForm() {
         highSchoolPercentage: formData.highSchoolPercentage
           ? parseFloat(formData.highSchoolPercentage)
           : null,
-        dormType: parseInt(formData.dormType),
+        dormType: 1,
+        dormTypeName: formData.dormType,
         buildingNumber: formData.buildingNumber,
         roomNumber: formData.roomNumber,
         hasSpecialNeeds: formData.hasSpecialNeeds,
@@ -325,10 +333,10 @@ export default function StudentForm() {
           isEgyptian: data.isEgyptian ?? true,
           firstName: data.firstName || "",
           lastName: data.lastName || "",
-          status: data.status ?? 1,
+          status: data.status || "NewStudent",
           email: data.email || "",
           phoneNumber: data.phoneNumber || "",
-          religion: data.religion ?? 1,
+          religion: data.religion ?? "Muslim",
           government: data.government || "",
           district: data.district || "",
           streetName: data.streetName || "",
@@ -339,7 +347,7 @@ export default function StudentForm() {
           secondarySchoolName: data.secondarySchoolName || "",
           secondarySchoolGovernment: data.secondarySchoolGovernment || "",
           highSchoolPercentage: data.highSchoolPercentage || null,
-          dormType: data.dormType || 1,
+          dormType: data.dormTypeName || data.dormType || "",
           buildingNumber: data.buildingNumber || "",
           roomNumber: data.roomNumber || "",
           hasSpecialNeeds: data.hasSpecialNeeds || false,
@@ -363,7 +371,32 @@ export default function StudentForm() {
     fetchStudent();
   }, [id, isEditMode, navigate]);
 
-  const isNewStudent = parseInt(formData.status) === 1;
+  useEffect(() => {
+    fetchAvailableDormTypes();
+  }, []);
+
+  useEffect(() => {
+    // Set first available dorm type as default if not set
+    if (availableDormTypes.length > 0 && !formData.dormType) {
+      setFormData((prev) => ({
+        ...prev,
+        dormType: availableDormTypes[0],
+      }));
+    }
+  }, [availableDormTypes]);
+
+  const fetchAvailableDormTypes = async () => {
+    try {
+      const data = await fetchAPI("/api/Meals/available-dorm-types");
+      setAvailableDormTypes(data || []);
+    } catch (err: any) {
+      console.error("Error fetching dorm types:", err);
+      // Use default dorm types if API fails
+      setAvailableDormTypes(["عادي", "مميز", "فندقي"]);
+    }
+  };
+
+  const isNewStudent = formData.status === "NewStudent";
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -577,8 +610,8 @@ export default function StudentForm() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
                   required
                 >
-                  <option value="1">طالب جديد</option>
-                  <option value="2">طالب قديم</option>
+                  <option value="NewStudent">طالب جديد</option>
+                  <option value="OldStudent">طالب قديم</option>
                 </select>
               </div>
 
@@ -663,9 +696,9 @@ export default function StudentForm() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
                   required
                 >
-                  <option value="1">مسلم</option>
-                  <option value="2">مسيحي</option>
-                  <option value="3">أخرى</option>
+                  <option value="Muslim">مسلم</option>
+                  <option value="Christian">مسيحي</option>
+                  <option value="Other">أخرى</option>
                 </select>
               </div>
             </div>
@@ -924,9 +957,12 @@ export default function StudentForm() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
                   required
                 >
-                  <option value="1">عادي</option>
-                  <option value="2">مميز</option>
-                  <option value="3">فندقي</option>
+                  <option value="">اختر نوع السكن</option>
+                  {availableDormTypes.map((dormType) => (
+                    <option key={dormType} value={dormType}>
+                      {dormType}
+                    </option>
+                  ))}
                 </select>
               </div>
 

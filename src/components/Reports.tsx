@@ -116,6 +116,7 @@ function DailyReport({
 }: any) {
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [paymentFilter, setPaymentFilter] = useState<"all" | "paid" | "unpaid">("all");
 
   useEffect(() => {
     fetchDailyReport();
@@ -143,7 +144,15 @@ function DailyReport({
       : (reportData?.buildingGroups || []).filter(
           (b: any) => b.buildingNumber === selectedBuilding
         );
-
+  const displayBuildings = filteredBuildings.map((building: any) => ({
+    ...building,
+    students: building.students.filter((s: any) => {
+      if (paymentFilter === "all") return true;
+      if (paymentFilter === "paid") return s.isFeesPaid === true;
+      if (paymentFilter === "unpaid") return s.isFeesPaid === false;
+      return true;
+    }),
+  }));
   /* ------------------ EXPORT HANDLERS ------------------ */
 
   const handleExportPDF = () =>
@@ -151,7 +160,7 @@ function DailyReport({
 
   const handleExportExcel = () => {
     const rows: any[] = [];
-    filteredBuildings.forEach((b: any) => {
+    displayBuildings.forEach((b: any) => {
       b.students.forEach((s: any) => {
         rows.push({
           الاسم: s.name,
@@ -161,7 +170,7 @@ function DailyReport({
           "إفطار/عشاء": s.missedBreakfastDinner ? "غائب" : "حاضر",
           الغداء: s.missedLunch ? "غائب" : "حاضر",
           "إجمالي الوجبات": s.totalMissedMealsToday,
-          "المبلغ المستحق": s.outstandingAmount || 0,
+          "حالة الدفع": s.isFeesPaid ? "مُدفوع" : "غير مُدفوع",
         });
       });
     });
@@ -196,7 +205,7 @@ function DailyReport({
         </div>
 
         {/* Inputs */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           <div>
             <label className="block text-gray-700 font-semibold mb-2">
               التاريخ
@@ -226,6 +235,21 @@ function DailyReport({
               ))}
             </select>
           </div>
+
+          <div>
+            <label className="block text-gray-700 font-semibold mb-2">
+              حالة الدفع
+            </label>
+            <select
+              value={paymentFilter}
+              onChange={(e) => setPaymentFilter(e.target.value as any)}
+              className="w-full px-4 py-2 border rounded-lg"
+            >
+              <option value="all">جميع الطلاب</option>
+              <option value="unpaid">🔴 غير مُدفوع</option>
+              <option value="paid">✅ مُدفوع</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -236,18 +260,25 @@ function DailyReport({
         </div>
       ) : reportData ? (
         <div id="daily-table">
-          {filteredBuildings.map((building: any) => (
+          {displayBuildings.map((building: any) => (
             <div
               key={building.buildingNumber}
               className="bg-white rounded-lg shadow mt-6"
             >
-              <div className="p-6 border-b flex justify-between">
-                <h2 className="text-xl font-bold text-gray-900">
-                  مبنى {building.buildingNumber}
-                </h2>
-                <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-semibold">
-                  {building.studentsWhoDidntEat} طالب لم يأكل
-                </span>
+              <div className="p-6 border-b flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    مبنى {building.buildingNumber}
+                  </h2>
+                  <div className="flex gap-4 mt-2 text-sm">
+                    <span className="text-red-600 font-semibold">
+                      🔴 غير مُدفوع: {building.unpaidStudents || 0}
+                    </span>
+                    <span className="text-green-600 font-semibold">
+                      ✅ مُدفوع: {building.paidStudents || 0}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -261,7 +292,7 @@ function DailyReport({
                       <Th center>إفطار/عشاء</Th>
                       <Th center>الغداء</Th>
                       <Th center>إجمالي الوجبات الفائتة</Th>
-                      <Th center>المبلغ المستحق</Th>
+                      <Th center>حالة الدفع</Th>
                     </tr>
                   </thead>
 
@@ -293,13 +324,7 @@ function DailyReport({
                         </Td>
 
                         <Td center>
-                          {(s.outstandingAmount || 0) > 0 ? (
-                            <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full font-semibold">
-                              {(s.outstandingAmount || 0).toFixed(2)} جنيه
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">0</span>
-                          )}
+                          <PaymentStatusBadge isPaid={s.isFeesPaid} />
                         </Td>
                       </tr>
                     ))}
@@ -328,6 +353,7 @@ function MonthlyReport({
 }: any) {
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [paymentFilter, setPaymentFilter] = useState<"all" | "paid" | "unpaid">("all");
 
   useEffect(() => {
     fetchMonthlyReport();
@@ -359,6 +385,16 @@ function MonthlyReport({
           (b: any) => b.buildingNumber === selectedBuilding
         );
 
+  const displayBuildings = filteredBuildings.map((building: any) => ({
+    ...building,
+    students: building.students.filter((s: any) => {
+      if (paymentFilter === "all") return true;
+      if (paymentFilter === "paid") return s.isFeesPaid === true;
+      if (paymentFilter === "unpaid") return s.isFeesPaid === false;
+      return true;
+    }),
+  }));
+
   /* ------------------ EXPORT ------------------ */
 
   const handleExportPDF = () =>
@@ -376,8 +412,8 @@ function MonthlyReport({
           الغداء: s.missedLunchCount,
           "إجمالي الوجبات": s.totalMissedMeals,
           "أيام الإجازة": s.daysOnHoliday,
-          الغرامة: s.totalPenalty,
-          "المبلغ المستحق": s.outstandingAmount || 0,
+          "الغرامة": s.totalPenalty,
+          "حالة الدفع": s.isFeesPaid ? "مُدفوع" : "غير مُدفوع",
         });
       });
     });
@@ -411,7 +447,7 @@ function MonthlyReport({
         </div>
 
         {/* Inputs */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
           <div>
             <label className="block text-gray-700 font-semibold mb-2">
               من تاريخ
@@ -453,6 +489,21 @@ function MonthlyReport({
               ))}
             </select>
           </div>
+
+          <div>
+            <label className="block text-gray-700 font-semibold mb-2">
+              حالة الدفع
+            </label>
+            <select
+              value={paymentFilter}
+              onChange={(e) => setPaymentFilter(e.target.value as any)}
+              className="w-full px-4 py-2 border rounded-lg"
+            >
+              <option value="all">جميع الطلاب</option>
+              <option value="unpaid">🔴 غير مُدفوع</option>
+              <option value="paid">✅ مُدفوع</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -463,16 +514,31 @@ function MonthlyReport({
         </div>
       ) : reportData ? (
         <div id="monthly-table">
-          {filteredBuildings.map((building: any) => (
+          {displayBuildings.map((building: any) => (
             <div
               key={building.buildingNumber}
               className="bg-white rounded-lg shadow mt-6"
             >
-              <div className="p-6 border-b flex justify-between">
-                <h2 className="text-xl font-bold text-gray-900">
-                  مبنى {building.buildingNumber} – {building.students.length}{" "}
-                  طالب
-                </h2>
+              <div className="p-6 border-b flex justify-between items-start">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    مبنى {building.buildingNumber} – {building.students.length} طالب
+                  </h2>
+                  <div className="flex gap-4 mt-2 text-sm">
+                    <span className="text-red-600 font-semibold">
+                      🔴 غير مُدفوع: {building.unpaidStudents || 0}
+                    </span>
+                    <span className="text-green-600 font-semibold">
+                      ✅ مُدفوع: {building.paidStudents || 0}
+                    </span>
+                    <span className="text-gray-600 font-semibold ml-4">
+                      💰 غرامة غير مدفوعة: {building.unpaidPenalty?.toFixed(2) || 0} جنيه
+                    </span>
+                    <span className="text-green-600 font-semibold">
+                      ✅ غرامة مدفوعة: {building.paidPenalty?.toFixed(2) || 0} جنيه
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -486,8 +552,8 @@ function MonthlyReport({
                       <Th center>غداء فائت</Th>
                       <Th center>إجمالي الوجبات</Th>
                       <Th center>أيام الإجازة</Th>
-                      <Th center>الغرامة المتوقعة</Th>
-                      <Th center>المبلغ المستحق</Th>
+                      <Th center>الغرامة</Th>
+                      <Th center>حالة الدفع</Th>
                     </tr>
                   </thead>
 
@@ -513,16 +579,18 @@ function MonthlyReport({
                         </Td>
 
                         <Td center>{s.daysOnHoliday}</Td>
-                        <Td center>{s.totalPenalty.toFixed(2)} جنيه</Td>
-
                         <Td center>
-                          {(s.outstandingAmount || 0) > 0 ? (
+                          {(s.totalPenalty || 0) > 0 ? (
                             <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full font-semibold">
-                              {(s.outstandingAmount || 0).toFixed(2)} جنيه
+                              {(s.totalPenalty || 0).toFixed(2)} جنيه
                             </span>
                           ) : (
                             <span className="text-gray-400">0</span>
                           )}
+                        </Td>
+
+                        <Td center>
+                          <PaymentStatusBadge isPaid={s.isFeesPaid} />
                         </Td>
                       </tr>
                     ))}
@@ -573,6 +641,18 @@ function StatusBadge({ value }: any) {
   ) : (
     <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-sm font-semibold">
       غائب
+    </span>
+  );
+}
+
+function PaymentStatusBadge({ isPaid }: any) {
+  return isPaid ? (
+    <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+      ✅ مُدفوع
+    </span>
+  ) : (
+    <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-semibold">
+      🔴 غير مُدفوع
     </span>
   );
 }

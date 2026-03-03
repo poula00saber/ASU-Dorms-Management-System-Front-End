@@ -29,15 +29,7 @@ interface Student {
   roomNumber?: string;
 }
 
-// Arabic translations for dorm types
-const dormTypeTranslations: Record<string, string> = {
-  "1": "عادي",
-  "2": "مميز",
-  "3": "فندقي",
-  Normal: "عادي",
-  Premium: "مميز",
-  Hotel: "فندقي",
-};
+// Dorm types are now fetched from backend - no hardcoded mapping needed
 
 // Arabic building names
 const buildings = [
@@ -87,7 +79,7 @@ export default function StudentsList() {
           faculty: studentDto.faculty || "",
           level: studentDto.level?.toString() || "",
           building: studentDto.buildingNumber || "",
-          dormType: studentDto.dormType?.toString() || "",
+          dormType: studentDto.dormTypeName || "",
           email: studentDto.email,
           phoneNumber: studentDto.phoneNumber,
           government: studentDto.government,
@@ -187,9 +179,9 @@ export default function StudentsList() {
     }
   };
 
-  // Translate dorm type
+  // Translate dorm type - now returns the name directly from backend
   const translateDormType = (dormType: string): string => {
-    return dormTypeTranslations[dormType] || dormType;
+    return dormType; // Dorm type names are fetched from backend, use them as-is
   };
 
   // Filter

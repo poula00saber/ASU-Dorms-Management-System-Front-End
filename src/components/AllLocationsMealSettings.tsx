@@ -23,15 +23,10 @@ interface DormLocationSetting {
   lunchStartTime?: string;
   lunchEndTime?: string;
   missedMealFeeAmount?: number;
-  monthlyFees?: Record<number, number>; // { dormTypeId: feeAmount }
+  monthlyFees?: Record<string, number>; // { dormTypeName: feeAmount }
 }
 
-// Dorm type ID → Arabic label mapping
-const dormTypeLabels: Record<number, string> = {
-  1: "عادي",
-  2: "مميز",
-  3: "فندقي",
-};
+// Note: Dorm type labels are fetched from API dynamically
 
 // Visual Time Picker Component
 interface TimePickerProps {
@@ -210,10 +205,22 @@ export default function AllLocationsMealSettings() {
 
   // Monthly fee editing state
   const [editingFeesLocationId, setEditingFeesLocationId] = useState<number | null>(null);
-  const [feesForm, setFeesForm] = useState<Record<number, number>>({});
+  const [feesForm, setFeesForm] = useState<Record<string, number>>({});
   const [savingFees, setSavingFees] = useState(false);
   const [applyFeesToAll, setApplyFeesToAll] = useState(false);
   const [applySettingsToAll, setApplySettingsToAll] = useState(false);
+
+  // Available dorm types from database
+  const [availableDormTypes, setAvailableDormTypes] = useState<string[]>([]);
+  
+  // Add new dorm type modal state
+  const [showAddDormTypeModal, setShowAddDormTypeModal] = useState(false);
+  const [newDormTypeName, setNewDormTypeName] = useState("");
+  const [newDormTypeMonthlyFee, setNewDormTypeMonthlyFee] = useState<number>(0);
+  const [addingDormType, setAddingDormType] = useState(false);
+  
+  // Current location being edited (for checking combined meal scan setting)
+  const [currentEditingLocation, setCurrentEditingLocation] = useState<DormLocationSetting | null>(null);
 
   // Accessible dorm location IDs for the current user
   const userInfo = getUserInfo();
@@ -221,7 +228,17 @@ export default function AllLocationsMealSettings() {
 
   useEffect(() => {
     fetchSettings();
+    fetchAvailableDormTypes();
   }, []);
+  
+  const fetchAvailableDormTypes = async () => {
+    try {
+      const data = await fetchAPI("/api/Meals/available-dorm-types");
+      setAvailableDormTypes(data || []);
+    } catch (err: any) {
+      console.error("Error fetching dorm types:", err);
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -271,14 +288,19 @@ export default function AllLocationsMealSettings() {
 
   const handleEditLocation = (location: DormLocationSetting) => {
     setEditingLocationId(location.id);
+    setCurrentEditingLocation(location);
     setApplySettingsToAll(false);
+    
+    const formattedStart = formatTimeForInput(location.breakfastDinnerStartTime);
+    const formattedEnd = formatTimeForInput(location.breakfastDinnerEndTime);
+    const formattedLunchStart = formatTimeForInput(location.lunchStartTime);
+    const formattedLunchEnd = formatTimeForInput(location.lunchEndTime);
+    
     setEditForm({
-      breakfastDinnerStartTime:
-        formatTimeForInput(location.breakfastDinnerStartTime) || "17:00",
-      breakfastDinnerEndTime:
-        formatTimeForInput(location.breakfastDinnerEndTime) || "21:00",
-      lunchStartTime: formatTimeForInput(location.lunchStartTime) || "13:00",
-      lunchEndTime: formatTimeForInput(location.lunchEndTime) || "21:00",
+      breakfastDinnerStartTime: formattedStart && formattedStart.length === 5 ? formattedStart : "17:00",
+      breakfastDinnerEndTime: formattedEnd && formattedEnd.length === 5 ? formattedEnd : "21:00",
+      lunchStartTime: formattedLunchStart && formattedLunchStart.length === 5 ? formattedLunchStart : "13:00",
+      lunchEndTime: formattedLunchEnd && formattedLunchEnd.length === 5 ? formattedLunchEnd : "21:00",
       missedMealFeeAmount: location.missedMealFeeAmount || 0,
     });
   };
@@ -337,13 +359,61 @@ export default function AllLocationsMealSettings() {
     }
   };
 
+  const handleAddNewDormType = async () => {
+    if (!newDormTypeName.trim()) {
+      toast.error("يرجى إدخال اسم نوع السكن");
+      return;
+    }
+    
+    try {
+      setAddingDormType(true);
+      // Send request to backend - only send dormTypeName and monthlyFee per API spec
+      await fetchAPI("/api/Meals/add-dorm-type", {
+        method: "POST",
+        body: JSON.stringify({
+          dormTypeName: newDormTypeName.trim(),
+          monthlyFee: newDormTypeMonthlyFee,
+        }),
+      });
+      
+      // Add to available dorm types if not already there
+      const trimmedName = newDormTypeName.trim();
+      if (!availableDormTypes.includes(trimmedName)) {
+        setAvailableDormTypes([...availableDormTypes, trimmedName]);
+      }
+      
+      // Add to current editing location's fees form
+      if (editingFeesLocationId) {
+        setFeesForm({ ...feesForm, [trimmedName]: newDormTypeMonthlyFee });
+      }
+      
+      toast.success(`تم إضافة نوع السكن "${newDormTypeName}" بنجاح`);
+      setShowAddDormTypeModal(false);
+      setNewDormTypeName("");
+      setNewDormTypeMonthlyFee(0);
+    } catch (err: any) {
+      toast.error(err.message || "حدث خطأ أثناء إضافة نوع السكن");
+    } finally {
+      setAddingDormType(false);
+    }
+  };
+
   const formatTimeForInput = (time?: string): string => {
     if (!time) return "";
+    
     // Handle TimeSpan format "HH:MM:SS" -> "HH:MM"
-    const parts = time.split(":");
-    if (parts.length >= 2) {
-      return `${parts[0].padStart(2, "0")}:${parts[1].padStart(2, "0")}`;
+    if (time.includes(":")) {
+      const parts = time.split(":");
+      if (parts.length >= 2) {
+        // Ensure we have valid hour and minute
+        const hour = parseInt(parts[0]);
+        const minute = parseInt(parts[1]);
+        if (!isNaN(hour) && !isNaN(minute)) {
+          return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+        }
+      }
     }
+    
     return time;
   };
 
@@ -414,6 +484,7 @@ export default function AllLocationsMealSettings() {
       }
 
       setEditingLocationId(null);
+      setCurrentEditingLocation(null);
       setApplySettingsToAll(false);
     } catch (err: any) {
       toast.error(err.message || "حدث خطأ أثناء حفظ الإعدادات");
@@ -676,9 +747,9 @@ export default function AllLocationsMealSettings() {
                 <div className="bg-purple-50 rounded-lg p-3">
                   <p className="text-xs text-purple-900 font-semibold mb-2">الرسوم الشهرية:</p>
                   <div className="grid grid-cols-3 gap-2 text-xs text-purple-800">
-                    {Object.entries(location.monthlyFees || {}).map(([typeId, amount]) => (
-                      <div key={typeId} className="text-center">
-                        <span className="block font-semibold">{dormTypeLabels[Number(typeId)] || `نوع ${typeId}`}</span>
+                    {Object.entries(location.monthlyFees || {}).map(([typeName, amount]) => (
+                      <div key={typeName} className="text-center">
+                        <span className="block font-semibold">{typeName}</span>
                         <span>{amount} جنيه</span>
                       </div>
                     ))}
@@ -693,15 +764,15 @@ export default function AllLocationsMealSettings() {
                   <div className="bg-purple-50 rounded-lg p-4 space-y-3 border border-purple-200">
                     <h4 className="font-bold text-purple-900 text-sm">تعديل الرسوم الشهرية</h4>
                     <div className="space-y-2">
-                      {Object.entries(feesForm).map(([typeId, amount]) => (
-                        <div key={typeId} className="flex items-center gap-2">
-                          <label className="text-xs text-gray-600 w-16 shrink-0">{dormTypeLabels[Number(typeId)] || `نوع ${typeId}`}</label>
+                      {Object.entries(feesForm).map(([typeName, amount]) => (
+                        <div key={typeName} className="flex items-center gap-2">
+                          <label className="text-xs text-gray-600 w-16 shrink-0">{typeName}</label>
                           <input
                             type="number"
                             step="0.01"
                             min="0"
                             value={amount}
-                            onChange={(e) => setFeesForm({ ...feesForm, [typeId]: parseFloat(e.target.value) || 0 })}
+                            onChange={(e) => setFeesForm({ ...feesForm, [typeName]: parseFloat(e.target.value) || 0 })}
                             className="flex-1 px-2 py-1.5 border rounded text-sm"
                           />
                           <span className="text-xs text-gray-500">جنيه</span>
@@ -711,9 +782,7 @@ export default function AllLocationsMealSettings() {
                       <button
                         type="button"
                         onClick={() => {
-                          const existingIds = Object.keys(feesForm).map(Number);
-                          const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
-                          setFeesForm({ ...feesForm, [nextId]: 0 });
+                          setShowAddDormTypeModal(true);
                         }}
                         className="w-full px-2 py-1.5 border border-dashed border-purple-300 text-purple-600 rounded text-xs hover:bg-purple-50 transition-colors"
                       >
@@ -759,7 +828,7 @@ export default function AllLocationsMealSettings() {
                           تعديل الإعدادات
                         </h4>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className={`grid gap-3 ${currentEditingLocation?.allowCombinedMealScan ? "grid-cols-2" : "grid-cols-2"}`}>
                           <div>
                             <label className="block text-xs text-gray-600 mb-1">
                               بداية إفطار/عشاء
@@ -792,38 +861,44 @@ export default function AllLocationsMealSettings() {
                               className="w-full px-2 py-1.5 border rounded text-sm"
                             />
                           </div>
-                          <div>
-                            <label className="block text-xs text-gray-600 mb-1">
-                              بداية غداء
-                            </label>
-                            <input
-                              type="time"
-                              value={editForm.lunchStartTime}
-                              onChange={(e) =>
-                                setEditForm({
-                                  ...editForm,
-                                  lunchStartTime: e.target.value,
-                                })
-                              }
-                              className="w-full px-2 py-1.5 border rounded text-sm"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-gray-600 mb-1">
-                              نهاية غداء
-                            </label>
-                            <input
-                              type="time"
-                              value={editForm.lunchEndTime}
-                              onChange={(e) =>
-                                setEditForm({
-                                  ...editForm,
-                                  lunchEndTime: e.target.value,
-                                })
-                              }
-                              className="w-full px-2 py-1.5 border rounded text-sm"
-                            />
-                          </div>
+
+                          {/* Show lunch times only if combined meal scanning is DISABLED */}
+                          {!currentEditingLocation?.allowCombinedMealScan && (
+                            <>
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">
+                                  بداية غداء
+                                </label>
+                                <input
+                                  type="time"
+                                  value={editForm.lunchStartTime}
+                                  onChange={(e) =>
+                                    setEditForm({
+                                      ...editForm,
+                                      lunchStartTime: e.target.value,
+                                    })
+                                  }
+                                  className="w-full px-2 py-1.5 border rounded text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">
+                                  نهاية غداء
+                                </label>
+                                <input
+                                  type="time"
+                                  value={editForm.lunchEndTime}
+                                  onChange={(e) =>
+                                    setEditForm({
+                                      ...editForm,
+                                      lunchEndTime: e.target.value,
+                                    })
+                                  }
+                                  className="w-full px-2 py-1.5 border rounded text-sm"
+                                />
+                              </div>
+                            </>
+                          )}
                         </div>
 
                         <div>
@@ -972,6 +1047,61 @@ export default function AllLocationsMealSettings() {
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   {saving ? "جاري التحديث..." : "تأكيد"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add New Dorm Type Modal */}
+      {showAddDormTypeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" dir="rtl">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-96">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">إضافة نوع سكن جديد</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">اسم نوع السكن</label>
+                <input
+                  type="text"
+                  value={newDormTypeName}
+                  onChange={(e) => setNewDormTypeName(e.target.value)}
+                  placeholder="مثال: الفندقي الممتاز"
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">الرسم الشهري (جنيه)</label>
+                <input
+                  type="number"
+                  value={newDormTypeMonthlyFee}
+                  onChange={(e) => setNewDormTypeMonthlyFee(parseFloat(e.target.value) || 0)}
+                  placeholder="0.00"
+                  step="0.01"
+                  min="0"
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowAddDormTypeModal(false);
+                    setNewDormTypeName("");
+                    setNewDormTypeMonthlyFee(0);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  إلغاء
+                </button>
+                <button
+                  onClick={handleAddNewDormType}
+                  disabled={addingDormType || !newDormTypeName.trim()}
+                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {addingDormType ? "جاري الإضافة..." : "إضافة"}
                 </button>
               </div>
             </div>
